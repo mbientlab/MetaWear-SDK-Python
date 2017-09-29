@@ -1,0 +1,13 @@
+include LICENSE.txt
+include README.rst
+
+recursive-include MetaWear-SDK-Cpp *
+prune MetaWear-SDK-Cpp/.git
+prune MetaWear-SDK-Cpp/build
+prune MetaWear-SDK-Cpp/dist
+
+recursive-include mbientlab *.py
+recursive-include examples *.py
+
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

@@ -1,5 +1,7 @@
 /build/
+/dist/
 /metawear.egg-info/
 mbientlab/metawear/*.so*
 mbientlab/metawear/cbindings.py
 *.pyc
+.metawear
