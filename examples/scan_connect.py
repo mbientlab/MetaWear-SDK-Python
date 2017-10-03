@@ -13,8 +13,8 @@ while selection == -1:
     devices = service.discover(2)
 
     i = 0
-    for address, name in devices.items():
-        print("[%d] %s" % (i, address))
+    for address, attr in devices.items():
+        print("[%d] %s (%s)" % (i, address, attr['name']))
         i+= 1
 
     msg = "Select your device (-1 to rescan): "
@@ -29,4 +29,5 @@ print("Connected")
 sleep(5.0)
 
 device.disconnect()
+sleep(1.0)
 print("Disconnected") 

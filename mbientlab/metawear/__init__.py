@@ -87,6 +87,8 @@ class _PyBlueZGatt(GATTRequester):
 
 class MetaWear(object):
     _METABOOT_SERVICE = uuid.UUID("00001530-1212-efde-1523-785feabcd123")
+    _METABOOT_CONTROL_POINT = GattChar(service_uuid_high = 0x000015301212efde, service_uuid_low = 0x1523785feabcd123, 
+            uuid_high = 0x000015311212efde, uuid_low = 0x1523785feabcd123)
 
     def __init__(self, address, **kwargs):
         """
@@ -115,16 +117,20 @@ class MetaWear(object):
 
         self.board = libmetawear.mbl_mw_metawearboard_create(byref(self._btle_connection))
 
+        if 'deserialize' not in kwargs or kwargs['deserialize']:
+            self.deserialize()
+
         try:
             os.makedirs(self.cache)
-            if 'deserialize' not in kwargs or kwargs['deserialize']:
-                self.deserialize()
         except OSError as exception:
             if exception.errno != errno.EEXIST:
                 raise
 
     @property
     def in_metaboot_mode(self):
+        """
+        True if the board is in MetaBoot mode.  The only permitted operation for MetaBoot boards is to update the firmware
+        """
         return str(MetaWear._METABOOT_SERVICE) in self.services
 
     def disconnect(self):
@@ -179,7 +185,10 @@ class MetaWear(object):
             buffer.append(value[i])
 
         handle = self.characteristics[_gattchar_to_string(ptr_gattchar.contents)]
-        self.gatt.write_by_handle_async(handle, bytes(bytearray(buffer)), self.response)
+        if self.in_metaboot_mode and ptr_gattchar.contents == MetaWear._METABOOT_CONTROL_POINT:
+            self.gatt.write_by_handle_async(handle, bytes(bytearray(buffer)), self.response)
+        else:
+            self.gatt.write_cmd_by_handle(handle, bytes(bytearray(buffer)))
 
     def _enable_notifications(self, caller, ptr_gattchar, handler, ready):
         handle = self.characteristics[_gattchar_to_string(ptr_gattchar.contents)]
@@ -189,7 +198,6 @@ class MetaWear(object):
 
     def _on_disconnect(self, caller, handler):
         pass
-
 
     def _download_firmware(self, version=None):
         firmware_root = os.path.join(self.cache, "firmware")
