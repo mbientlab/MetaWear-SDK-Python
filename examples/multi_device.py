@@ -1,3 +1,4 @@
+# usage: python multi_device [mac1] [mac2] ... [mac(n)]
 from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from time import sleep
@@ -5,6 +6,9 @@ from threading import Event
 
 import platform
 import sys
+
+if sys.version_info[0] == 2:
+    range = xrange
 
 class State:
     def __init__(self, device):
@@ -17,7 +21,7 @@ class State:
         self.samples+= 1
 
 states = []
-for i in xrange(len(sys.argv) - 1):
+for i in range(len(sys.argv) - 1):
     d = MetaWear(sys.argv[i + 1])
     d.connect()
     print("Connected to " + d.address)
@@ -25,7 +29,7 @@ for i in xrange(len(sys.argv) - 1):
 
 for s in states:
     print("configuring device")
-    libmetawear.mbl_mw_settings_set_connection_parameters(s.device.board, 7.5, 7.5, 0, 6000);
+    libmetawear.mbl_mw_settings_set_connection_parameters(s.device.board, 7.5, 7.5, 0, 6000)
     libmetawear.mbl_mw_acc_set_odr(s.device.board, 25.0);
     libmetawear.mbl_mw_acc_set_range(s.device.board, 16.0);
     libmetawear.mbl_mw_acc_write_acceleration_config(s.device.board);

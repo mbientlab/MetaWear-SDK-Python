@@ -9,7 +9,6 @@ import json
 import os
 import platform
 import requests
-import sets
 import time
 import uuid
 
@@ -45,8 +44,8 @@ def parse_value(p_data):
     """
     if (p_data.contents.type_id == DataTypeId.UINT32):
         return cast(p_data.contents.value, POINTER(c_uint)).contents.value
-    elif (p_data.contents.type_id == DataTypeId.INT32):
-        return cast(p_data.contents.value, POINTER(c_int).contents).value
+    elif (p_data.contents.type_id == DataTypeId.INT32 or p_data.contents.type_id == DataTypeId.SENSOR_ORIENTATION):
+        return cast(p_data.contents.value, POINTER(c_int)).contents.value
     elif (p_data.contents.type_id == DataTypeId.FLOAT):
         return cast(p_data.contents.value, POINTER(c_float)).contents.value
     elif (p_data.contents.type_id == DataTypeId.CARTESIAN_FLOAT):
@@ -87,8 +86,6 @@ class _PyBlueZGatt(GATTRequester):
 
 class MetaWear(object):
     _METABOOT_SERVICE = uuid.UUID("00001530-1212-efde-1523-785feabcd123")
-    _METABOOT_CONTROL_POINT = GattChar(service_uuid_high = 0x000015301212efde, service_uuid_low = 0x1523785feabcd123, 
-            uuid_high = 0x000015311212efde, uuid_low = 0x1523785feabcd123)
 
     def __init__(self, address, **kwargs):
         """
@@ -148,7 +145,7 @@ class MetaWear(object):
         """
         self.gatt.connect(True, channel_type='random')
 
-        self.services = sets.Set()
+        self.services = set()
         for s in self.gatt.discover_primary():
             self.services.add(s['uuid'])
 
@@ -185,7 +182,7 @@ class MetaWear(object):
             buffer.append(value[i])
 
         handle = self.characteristics[_gattchar_to_string(ptr_gattchar.contents)]
-        if self.in_metaboot_mode and ptr_gattchar.contents == MetaWear._METABOOT_CONTROL_POINT:
+        if (write_type == GattCharWriteType.WITH_RESPONSE):
             self.gatt.write_by_handle_async(handle, bytes(bytearray(buffer)), self.response)
         else:
             self.gatt.write_cmd_by_handle(handle, bytes(bytearray(buffer)))
@@ -292,7 +289,7 @@ class MetaWear(object):
         self._on_error = FnVoid_charP(self._dfu_error)
 
         path = self._download_firmware() if 'version' not in kwargs else self._download_firmware(version = kwargs['version'])
-        buffer = create_string_buffer(bytes(path))
+        buffer = create_string_buffer(path.encode('ascii'))
         self._dfu_delegate = DfuDelegate(on_dfu_started = self._on_started, on_dfu_cancelled = self._on_cancelled, 
                 on_transfer_percentage = self._on_transfer, on_successful_file_transferred = self._on_successful, on_error = self._on_error)
         libmetawear.mbl_mw_metawearboard_perform_dfu(self.board, byref(self._dfu_delegate), buffer.raw)

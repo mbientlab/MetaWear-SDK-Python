@@ -1,3 +1,4 @@
+# usage: python scan_connect.py
 from mbientlab.metawear import MetaWear
 from mbientlab.metawear.cbindings import *
 from gattlib import DiscoveryService

@@ -1,3 +1,4 @@
+# usage: python led.py [mac]
 from mbientlab.metawear import MetaWear, libmetawear
 from mbientlab.metawear.cbindings import *
 from time import sleep
