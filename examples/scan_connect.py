@@ -27,6 +27,7 @@ device = MetaWear(address)
 device.connect()
 
 print("Connected")
+print("Device information: " + str(device.info))
 sleep(5.0)
 
 device.disconnect()

@@ -4,13 +4,17 @@ from gattlib import GATTRequester, GATTResponse
 from threading import Event
 from .cbindings import *
 
+import copy
 import errno
 import json
 import os
-import platform
 import requests
+import sys
 import time
 import uuid
+
+if sys.version_info[0] == 2:
+    range = xrange
 
 so_path = os.path.join(os.path.dirname(__file__), 'libmetawear.so')
 libmetawear= CDLL(so_path)
@@ -67,6 +71,8 @@ def parse_value(p_data):
         return cast(p_data.contents.value, POINTER(Quaternion)).contents
     elif (p_data.contents.type_id == DataTypeId.CORRECTED_CARTESIAN_FLOAT):
         return cast(p_data.contents.value, POINTER(CorrectedCartesianFloat)).contents
+    elif (p_data.contents.type_id == DataTypeId.OVERFLOW_STATE):
+        return cast(p_data.contents.value, POINTER(OverflowState)).contents
     else:
         raise RuntimeError('Unrecognized data type id: ' + str(p_data.contents.type_id))
 
@@ -87,6 +93,10 @@ class _PyBlueZGatt(GATTRequester):
 class MetaWear(object):
     _METABOOT_SERVICE = uuid.UUID("00001530-1212-efde-1523-785feabcd123")
 
+    @staticmethod
+    def _convert(value):
+        return value if sys.version_info[0] == 2 else value.encode('utf8')
+
     def __init__(self, address, **kwargs):
         """
         Creates a MetaWear object
@@ -96,8 +106,7 @@ class MetaWear(object):
             device      - Optional  : hci device to use, defaults to 'hci0'
             deserialize - Optional  : Deserialize the cached C++ SDK state if available, defaults to true
         """
-        self.hw = None
-        self.model = None
+        self.info = {}
 
         self.address = address
         self.cache = kwargs['cache_path'] if ('cache_path' in kwargs) else ".metawear"
@@ -153,10 +162,22 @@ class MetaWear(object):
         for c in self.gatt.discover_characteristics():
             self.characteristics[c['uuid']] = c['value_handle']
 
+        if ('hardware' not in self.info):
+            self.info['hardware'] = self.gatt.read_by_uuid("00002a27-0000-1000-8000-00805f9b34fb")[0]
+
+        if ('manufacturer' not in self.info):
+            self.info['manufacturer'] = self.gatt.read_by_uuid("00002a29-0000-1000-8000-00805f9b34fb")[0]
+
+        if ('serial' not in self.info):
+            self.info['serial'] = self.gatt.read_by_uuid("00002a25-0000-1000-8000-00805f9b34fb")[0]
+
+        if ('model' not in self.info):
+            self.info['model'] = self.gatt.read_by_uuid("00002a24-0000-1000-8000-00805f9b34fb")[0]
+
         if not self.in_metaboot_mode:
             init_event = Event()
             def init_handler(device, status):
-                self.init_status = status;
+                self.init_status = status
                 init_event.set()
 
             init_handler_fn = FnVoid_VoidP_Int(init_handler)
@@ -169,10 +190,19 @@ class MetaWear(object):
 
             if 'serialize' not in kwargs or kwargs['serialize']:
                 self.serialize()
+        else:
+            self.info['firmware'] = self.gatt.read_by_uuid("00002a26-0000-1000-8000-00805f9b34fb")[0]
 
     def _read_gatt_char(self, caller, ptr_gattchar, handler):
-        value = self.gatt.read_by_uuid(_gattchar_to_string(ptr_gattchar.contents))[0]
-        value = value if platform.python_version_tuple()[0] == '2' else value.encode('utf8')
+        uuid = _gattchar_to_string(ptr_gattchar.contents)
+        raw = self.gatt.read_by_uuid(uuid)[0]
+
+        if (('model' not in self.info) and uuid == "00002a24-0000-1000-8000-00805f9b34fb"):
+            self.info['model'] = raw
+        elif (uuid == "00002a26-0000-1000-8000-00805f9b34fb"):
+            self.info['firmware'] = raw
+
+        value = MetaWear._convert(raw)
         buffer = create_string_buffer(value, len(value))
         handler(caller, cast(buffer, POINTER(c_ubyte)), len(buffer.raw))
 
@@ -206,28 +236,24 @@ class MetaWear(object):
             with open(info1, "rb") as f:
                 info1_content = json.load(f)
 
-        if (self.hw == None):
-            self.hw = self.gatt.read_by_uuid("00002a27-0000-1000-8000-00805f9b34fb")[0]
-
-        if (self.model == None):
-            self.model = self.gatt.read_by_uuid("00002a24-0000-1000-8000-00805f9b34fb")[0]
-
         if version is None:
             versions = []
-            for k in info1_content[self.hw][self.model]["vanilla"].keys():
+            for k in info1_content[self.info['hardware']][self.info['model']]["vanilla"].keys():
                 versions.append(LooseVersion(k))
             versions.sort()
             target = str(versions[-1])
         else:
-            if version not in info1_content[self.hw][self.model]["vanilla"]:
+            if version not in info1_content[self.info['hardware']][self.info['model']]["vanilla"]:
                 raise ValueError("Firmware '%s' not available for this board" % (version))
             target = version
 
-        filename = info1_content[self.hw][self.model]["vanilla"][target]["filename"]
-        local_path = os.path.join(firmware_root, self.hw, self.model, "vanilla", target, filename)
+        filename = info1_content[self.info['hardware']][self.info['model']]["vanilla"][target]["filename"]
+        local_path = os.path.join(firmware_root, self.info['hardware'], self.info['model'], "vanilla", target, filename)
 
         if not os.path.isfile(local_path):
-            url = "https://releases.mbientlab.com/metawear/{}/{}/{}/{}/{}".format(self.hw, self.model, "vanilla", target, filename)
+            url = "https://releases.mbientlab.com/metawear/{}/{}/{}/{}/{}".format(
+                self.info['hardware'], self.info['model'], "vanilla", target, filename
+            )
             _download_file(url, local_path)
         return local_path
 
@@ -235,26 +261,45 @@ class MetaWear(object):
         """
         Serialize and cache the SDK state
         """
-        path = os.path.join(self.cache, '%s.bin' % (self.address.replace(':','')))
+        mac_str = self.address.replace(':','')
+        path = os.path.join(self.cache, '%s.json' % (mac_str))
+
+        state = { "info": copy.deepcopy(self.info) }
 
         size = c_uint(0)
-        state = cast(libmetawear.mbl_mw_metawearboard_serialize(self.board, byref(size)), POINTER(c_ubyte * size.value))
-        with open(path, "wb") as f:
-            f.write(state.contents)
+        cpp_state = cast(libmetawear.mbl_mw_metawearboard_serialize(self.board, byref(size)), POINTER(c_ubyte * size.value))
+        state["cpp_state"] = [cpp_state.contents[i] for i in range(0, size.value)]
+        libmetawear.mbl_mw_memory_free(cpp_state)
 
-        libmetawear.mbl_mw_memory_free(state)
-
+        with open(path, "w") as f:
+            f.write(json.dumps(state, indent=2))
+        
     def deserialize(self):
         """
         Deserialize the cached SDK state
         """
-        path = os.path.join(self.cache, '%s.bin' % (self.address.replace(':','')))
+        mac_str = self.address.replace(':','')
+
+        # See if old serialized state exists, if it does, read that then remove it
+        path = os.path.join(self.cache, '%s.bin' % (mac_str))
         if os.path.isfile(path):
             with(open(path, "rb")) as f:
                 content = f.read()
                 raw = (c_ubyte * len(content)).from_buffer_copy(content)
                 libmetawear.mbl_mw_metawearboard_deserialize(self.board, raw, len(content))
+
+            os.remove(path)
             return True
+
+        path = os.path.join(self.cache, '%s.json' % (mac_str))
+        if os.path.isfile(path):
+            with(open(path, "r")) as f:
+                content = json.loads(f.read())
+                self.info = content["info"]
+                raw = (c_ubyte * len(content)).from_buffer_copy(bytearray(content["cpp_state"]))
+                libmetawear.mbl_mw_metawearboard_deserialize(self.board, raw, len(content))
+            return True
+
         return False
 
     def update_firmware_async(self, handler, **kwargs):
