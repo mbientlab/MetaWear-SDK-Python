@@ -152,7 +152,16 @@ class MetaWear(object):
         @params:
             serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
         """
-        self.gatt.connect(True, channel_type='random')
+        try:
+            self.gatt.connect(True, channel_type='random')
+        except RuntimeError as e:
+            # gattlib.connect's `wait=True` requires elevated permission
+            # or modified capabilities.
+            # It still connects, but a RuntimeError is raised. Check if
+            # `self.gatt` is connected, and rethrow exception otherwise.
+            if not self.gatt.is_connected():
+                raise e
+
 
         self.services = set()
         for s in self.gatt.discover_primary():
