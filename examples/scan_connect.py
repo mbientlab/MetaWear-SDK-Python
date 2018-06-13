@@ -1,21 +1,30 @@
 # usage: python scan_connect.py
 from mbientlab.metawear import MetaWear
 from mbientlab.metawear.cbindings import *
-from gattlib import DiscoveryService
+from mbientlab.warble import * 
 from time import sleep
 
 import platform
+import six
 
 selection = -1
 devices = None
 
 while selection == -1:
-    service = DiscoveryService("hci0")
-    devices = service.discover(2)
+    print("scanning for devices...")
+    devices = {}
+    def handler(result):
+        devices[result.mac] = result.name
+
+    BleScanner.set_handler(handler)
+    BleScanner.start()
+
+    sleep(10.0)
+    BleScanner.stop()
 
     i = 0
-    for address, attr in devices.items():
-        print("[%d] %s (%s)" % (i, address, attr['name']))
+    for address, name in six.iteritems(devices):
+        print("[%d] %s (%s)" % (i, address, name))
         i+= 1
 
     msg = "Select your device (-1 to rescan): "

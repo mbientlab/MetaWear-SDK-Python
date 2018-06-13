@@ -14,9 +14,9 @@ class State:
     def __init__(self, device):
         self.device = device
         self.samples = 0
-        self.callback = FnVoid_DataP(self.data_handler)
+        self.callback = FnVoid_VoidP_DataP(self.data_handler)
 
-    def data_handler(self, data):
+    def data_handler(self, ctx, data):
         print("%s -> %s" % (self.device.address, parse_value(data)))
         self.samples+= 1
 
@@ -30,15 +30,15 @@ for i in range(len(sys.argv) - 1):
 for s in states:
     print("configuring device")
     libmetawear.mbl_mw_settings_set_connection_parameters(s.device.board, 7.5, 7.5, 0, 6000)
-    libmetawear.mbl_mw_acc_set_odr(s.device.board, 25.0);
-    libmetawear.mbl_mw_acc_set_range(s.device.board, 16.0);
-    libmetawear.mbl_mw_acc_write_acceleration_config(s.device.board);
+    libmetawear.mbl_mw_acc_set_odr(s.device.board, 25.0)
+    libmetawear.mbl_mw_acc_set_range(s.device.board, 16.0)
+    libmetawear.mbl_mw_acc_write_acceleration_config(s.device.board)
 
     signal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(s.device.board)
-    libmetawear.mbl_mw_datasignal_subscribe(signal, s.callback)
+    libmetawear.mbl_mw_datasignal_subscribe(signal, None, s.callback)
 
-    libmetawear.mbl_mw_acc_enable_acceleration_sampling(s.device.board);
-    libmetawear.mbl_mw_acc_start(s.device.board);
+    libmetawear.mbl_mw_acc_enable_acceleration_sampling(s.device.board)
+    libmetawear.mbl_mw_acc_start(s.device.board)
 
 sleep(30.0)
 
