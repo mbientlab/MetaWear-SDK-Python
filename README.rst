@@ -9,12 +9,11 @@ Python SDK for creating MetaWear apps on the Linux platform.  This is a thin wra
 
 Install
 #######
-Use pip to install the metawear package.  It depends on `pygattlib <https://bitbucket.org/OscarAcena/pygattlib>`_ so ensure your Linux environment first has the necessary 
-`dependencies <https://bitbucket.org/OscarAcena/pygattlib/src/a858e8626a93cb9b4ad56f3fb980a6517a0702c6/DEPENDS?at=default&fileviewer=file-view-default>`_ installed.  
+Use pip to install the metawear package.  It depends on `PyWarble <https://github.com/mbientlab/PyWarble>`_ so ensure your target environment has the necessary `dependencies <https://github.com/mbientlab/Warble#build>`_ installed.  
 
 .. code-block:: bash
 
-    pip install metawear --process-dependency-links
+    pip install metawear
 
 Usage
 #####
@@ -25,23 +24,31 @@ Import the MetaWear class and libmetawear variable from the metawear module and 
     from mbientlab.metawear import MetaWear, libmetawear
     from mbientlab.metawear.cbindings import *
 
-If you do not know the MAC address of your device, use ``pygattlib`` to scan for nearby devices.  
+If you do not know the MAC address of your device, use ``PyWarble`` to scan for nearby devices.  
 
 .. code-block:: python
 
-    from gattlib import DiscoveryService
-    service = DiscoveryService("hci0")
-    devices = service.discover(2)
-
-    # grab the first scanned device
-    address = devices.items()[0][0]
-
+    from mbientlab.warble import *
+    from threading import Event
+    
+    e = Event()
+    address = None
+    def device_discover_task(result):
+        global address
+        # grab the first discoered device
+        address = result.mac
+        e.set()
+    
+    BleScanner.set_handler(scan_result_printer)
+    BleScanner.start()
+    e.wait()
+    
 Once you have the device's MAC address, create a MetaWear object with the MAC address and connect to the device.
 
 .. code-block:: python
 
     device = MetaWear(address)
-    status = device.connect()
+    device.connect()
 
 Upon a successful connection, you can begin calling any of the functions from the C++ SDK, for example, blinking the LED green.
 
