@@ -1,3 +1,4 @@
+from distutils.command.clean import clean
 from multiprocessing import cpu_count
 from shutil import copy2, move
 from subprocess import call, STDOUT
@@ -9,6 +10,23 @@ import platform
 import sys
 
 machine = "arm" if "arm" in platform.machine() else ("x64" if sys.maxsize > 2**32 else "x86")
+root = os.path.dirname(os.path.abspath(__file__))
+dest = os.path.join("mbientlab", "metawear")
+
+class MetaWearClean(clean):
+    def run(self):
+        bindings = os.path.join(dest, "cbindings.py")
+        if os.path.isfile(bindings):
+            os.remove(bindings)
+
+        if (platform.system() == 'Windows'):
+            dll = os.path.join(dest, "MetaWear.Win32.dll")
+            if os.path.isfile(dll):
+                os.remove(dll)
+        elif (platform.system() == 'Linux'):
+            for f in os.listdir(dest):
+                if (f.startswith("libmetawear.so")):
+                    os.remove(os.path.join(dest, f))
 
 class MetaWearBuild(build_py):
     @staticmethod
@@ -17,9 +35,7 @@ class MetaWearBuild(build_py):
             if (f.startswith(basename)):
                 move(os.path.join(src, f), dest)
 
-    def run(self):
-        root = os.path.dirname(os.path.abspath(__file__))
-        dest = os.path.join("mbientlab", "metawear")
+    def run(self):        
         cpp_sdk = os.path.join(root, 'MetaWear-SDK-Cpp')
         dist_dir = os.path.join(cpp_sdk, 'dist', 'release', 'lib', machine)
 
@@ -49,7 +65,7 @@ so_pkg_data = ['libmetawear.so'] if platform.system() == 'Linux' else ['MetaWear
 setup(
     name='metawear',
     packages=['mbientlab', 'mbientlab.metawear'],
-    version='0.4.0',
+    version='0.5.0',
     description='Python bindings for the MetaWear C++ SDK by MbientLab',
     long_description=open(os.path.join(os.path.dirname(__file__), "README.rst")).read(),
     package_data={'mbientlab.metawear': so_pkg_data},
@@ -58,11 +74,12 @@ setup(
     author='MbientLab',
     author_email="hello@mbientlab.com",
     install_requires=[
-        'warble >= 1.0, < 2.0',
+        'warble >= 1.1, < 2.0',
         'requests'
     ],
     cmdclass={
         'build_py': MetaWearBuild,
+        'clean': MetaWearClean
     },
     keywords = ['sensors', 'mbientlab', 'metawear', 'bluetooth le', 'native'],
     python_requires='>=2.7',
@@ -70,6 +87,7 @@ setup(
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Operating System :: POSIX :: Linux',
+        'Operating System :: Microsoft :: Windows :: Windows 10',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
     ]

@@ -48,7 +48,7 @@ def _download_file(url, dest):
         return content
 
 class MetaWear(object):
-    _METABOOT_SERVICE = "00001530-1212-efde-1523-785feabcd123"
+    GATT_SERVICE = "326a9000-85cb-9195-d9dd-464cfbbae75a"
     _DEV_INFO = {
         "00002a27-0000-1000-8000-00805f9b34fb": "hardware",
         "00002a29-0000-1000-8000-00805f9b34fb": "manufacturer",
@@ -117,7 +117,7 @@ class MetaWear(object):
         """
         True if the board is in MetaBoot mode.  The only permitted operation for MetaBoot boards is to update the firmware
         """
-        return self.warble.service_exists(MetaWear._METABOOT_SERVICE)
+        return self.warble.service_exists("00001530-1212-efde-1523-785feabcd123")
 
     def disconnect(self):
         """

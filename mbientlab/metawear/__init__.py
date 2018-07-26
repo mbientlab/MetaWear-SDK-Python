@@ -16,6 +16,22 @@ init_libmetawear(libmetawear)
 
 from .metawear import MetaWear
 
+_value_parsers = {
+    DataTypeId.UINT32: lambda p: cast(p.contents.value, POINTER(c_uint)).contents.value,
+    DataTypeId.INT32: lambda p: cast(p.contents.value, POINTER(c_int)).contents.value,
+    DataTypeId.FLOAT: lambda p: cast(p.contents.value, POINTER(c_float)).contents.value,
+    DataTypeId.CARTESIAN_FLOAT: lambda p: cast(p.contents.value, POINTER(CartesianFloat)).contents,
+    DataTypeId.BATTERY_STATE: lambda p: cast(p.contents.value, POINTER(BatteryState)).contents,
+    DataTypeId.TCS34725_ADC: lambda p: cast(p.contents.value, POINTER(Tcs34725ColorAdc)).contents,
+    DataTypeId.EULER_ANGLE: lambda p: cast(p.contents.value, POINTER(EulerAngles)).contents,
+    DataTypeId.QUATERNION: lambda p: cast(p.contents.value, POINTER(Quaternion)).contents,
+    DataTypeId.CORRECTED_CARTESIAN_FLOAT: lambda p: cast(p.contents.value, POINTER(CorrectedCartesianFloat)).contents,
+    DataTypeId.OVERFLOW_STATE: lambda p: cast(p.contents.value, POINTER(OverflowState)).contents,
+    DataTypeId.LOGGING_TIME: lambda p: cast(p.contents.value, POINTER(LoggingTime)).contents,
+    DataTypeId.BTLE_ADDRESS: lambda p: cast(p.contents.value, POINTER(BtleAddress)).contents,
+    DataTypeId.BOSCH_ANY_MOTION: lambda p: cast(p.contents.value, POINTER(BoschAnyMotion)).contents,
+    DataTypeId.CALIBRATION_STATE: lambda p: cast(p.contents.value, POINTER(CalibrationState)).contents
+}
 def parse_value(p_data):
     """
     Helper function to extract the value from a Data object.  If you are storing the values to be used at a later time, 
@@ -23,32 +39,12 @@ def parse_value(p_data):
     @params:
         p_data      - Required  : Pointer to a Data object
     """
-    if (p_data.contents.type_id == DataTypeId.UINT32):
-        return cast(p_data.contents.value, POINTER(c_uint)).contents.value
-    elif (p_data.contents.type_id == DataTypeId.INT32 or p_data.contents.type_id == DataTypeId.SENSOR_ORIENTATION):
-        return cast(p_data.contents.value, POINTER(c_int)).contents.value
-    elif (p_data.contents.type_id == DataTypeId.FLOAT):
-        return cast(p_data.contents.value, POINTER(c_float)).contents.value
-    elif (p_data.contents.type_id == DataTypeId.CARTESIAN_FLOAT):
-        return cast(p_data.contents.value, POINTER(CartesianFloat)).contents
-    elif (p_data.contents.type_id == DataTypeId.BATTERY_STATE):
-        return cast(p_data.contents.value, POINTER(BatteryState)).contents
+    if (p_data.contents.type_id in _value_parsers):
+        return _value_parsers[p_data.contents.type_id](p_data)
+    elif (p_data.contents.type_id == DataTypeId.SENSOR_ORIENTATION):
+        return _value_parsers[DataTypeId.INT32](p_data)
     elif (p_data.contents.type_id == DataTypeId.BYTE_ARRAY):
-        p_data_ptr= cast(p_data.contents.value, POINTER(c_ubyte * p_data.contents.length))
-
-        byte_array= []
-        for i in range(0, p_data.contents.length):
-            byte_array.append(p_data_ptr.contents[i])
-        return byte_array
-    elif (p_data.contents.type_id == DataTypeId.TCS34725_ADC):
-        return cast(p_data.contents.value, POINTER(Tcs34725ColorAdc)).contents
-    elif (p_data.contents.type_id == DataTypeId.EULER_ANGLE):
-        return cast(p_data.contents.value, POINTER(EulerAngles)).contents
-    elif (p_data.contents.type_id == DataTypeId.QUATERNION):
-        return cast(p_data.contents.value, POINTER(Quaternion)).contents
-    elif (p_data.contents.type_id == DataTypeId.CORRECTED_CARTESIAN_FLOAT):
-        return cast(p_data.contents.value, POINTER(CorrectedCartesianFloat)).contents
-    elif (p_data.contents.type_id == DataTypeId.OVERFLOW_STATE):
-        return cast(p_data.contents.value, POINTER(OverflowState)).contents
+        array_ptr= cast(p_data.contents.value, POINTER(c_ubyte * p_data.contents.length))
+        return [array_ptr.contents[i] for i in range(0, p_data.contents.length)]
     else:
         raise RuntimeError('Unrecognized data type id: ' + str(p_data.contents.type_id))

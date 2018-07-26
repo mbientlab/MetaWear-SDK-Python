@@ -1,13 +1,26 @@
 include LICENSE.txt
 include README.rst
 
-recursive-include MetaWear-SDK-Cpp *
-prune MetaWear-SDK-Cpp/.git
+graft MetaWear-SDK-Cpp
+prune MetaWear-SDK-Cpp/bindings/javascript
+prune MetaWear-SDK-Cpp/bindings/swift
+prune MetaWear-SDK-Cpp/cppdocs
 prune MetaWear-SDK-Cpp/build
 prune MetaWear-SDK-Cpp/dist
+prune MetaWear-SDK-Cpp/Debug
+prune MetaWear-SDK-Cpp/Release
+prune MetaWear-SDK-Cpp/x64
 
-recursive-include mbientlab *.py
-recursive-include examples *.py
+graft mbientlab
+recursive-exclude mbientlab/metawear cbindings.py
 
-recursive-exclude * __pycache__
-recursive-exclude * *.py[co]
+global-exclude *.git
+global-exclude *.gitmodules
+global-exclude *.gitignore
+global-exclude __pycache__
+global-exclude *.py[co]
+global-exclude *.d
+global-exclude *.o
+global-exclude *.so*
+global-exclude *.dll
+global-exclude *.a

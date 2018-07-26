@@ -29,19 +29,23 @@ If you do not know the MAC address of your device, use ``PyWarble`` to scan for 
 .. code-block:: python
 
     from mbientlab.warble import *
+    from mbientlab.metawear import *
     from threading import Event
     
     e = Event()
     address = None
     def device_discover_task(result):
         global address
-        # grab the first discoered device
-        address = result.mac
-        e.set()
+        if (result.has_service_uuid(MetaWear.GATT_SERVICE)):
+            # grab the first discovered metawear device
+            address = result.mac
+            e.set()
     
-    BleScanner.set_handler(scan_result_printer)
+    BleScanner.set_handler(device_discover_task)
     BleScanner.start()
     e.wait()
+
+    BleScanner.stop()
     
 Once you have the device's MAC address, create a MetaWear object with the MAC address and connect to the device.
 
