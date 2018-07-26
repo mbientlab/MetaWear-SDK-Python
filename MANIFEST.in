@@ -2,7 +2,6 @@ include LICENSE.txt
 include README.rst
 
 graft MetaWear-SDK-Cpp
-prune MetaWear-SDK-Cpp/bindings/javascript
 prune MetaWear-SDK-Cpp/bindings/swift
 prune MetaWear-SDK-Cpp/cppdocs
 prune MetaWear-SDK-Cpp/build
@@ -10,6 +9,7 @@ prune MetaWear-SDK-Cpp/dist
 prune MetaWear-SDK-Cpp/Debug
 prune MetaWear-SDK-Cpp/Release
 prune MetaWear-SDK-Cpp/x64
+recursive-exclude MetaWear-SDK-Cpp/bindings/javascript cbindings.js
 
 graft mbientlab
 recursive-exclude mbientlab/metawear cbindings.py
