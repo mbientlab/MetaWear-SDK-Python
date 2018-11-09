@@ -93,14 +93,6 @@ class MetaWear(object):
 
         if 'deserialize' not in kwargs or kwargs['deserialize']:
             self.deserialize()
-            dev_info = libmetawear.mbl_mw_metawearboard_get_device_information(self.board)
-            self.info = {
-                'hardware': dev_info.contents.hardware_revision.decode('utf8'),
-                'manufacturer': dev_info.contents.manufacturer.decode('utf8'),
-                'serial': dev_info.contents.serial_number.decode('utf8'),
-                'firmware': dev_info.contents.firmware_revision.decode('utf8'),
-                'model': dev_info.contents.model_number.decode('utf8')
-            }
 
         try:
             os.makedirs(self.cache)
@@ -125,65 +117,82 @@ class MetaWear(object):
         """
         self.warble.disconnect()
 
-    def connect(self, **kwargs):
+    def connect_async(self, handler, **kwargs):
         """
         Connects to the MetaWear board and initializes the SDK.  You must first connect to the board before using 
         any of the SDK functions
         @params:
+            handler     - Required  : `(BaseException) -> void` function to handle the result of the task
             serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
         """
-        e = Event()
-        result = None
+
         def completed(err):
             if (err != None):
-                result = err
+                handler(err)
+            else:
+                if not self.in_metaboot_mode:
+                    def init_handler(context, device, status):
+                        if status != Const.STATUS_OK:
+                            self.disconnect()
+                            handler(RuntimeError("Error initializing the API (%d)" % (status)))
+                        else:
+                            if 'serialize' not in kwargs or kwargs['serialize']:
+                                self.serialize()
+                            handler(None)
+
+                    self._init_handler = FnVoid_VoidP_VoidP_Int(init_handler)
+                    libmetawear.mbl_mw_metawearboard_initialize(self.board, None, self._init_handler)
+                else:
+                    def read_task():
+                        uuids = self._read_dev_info_state['uuids']
+                        if(len(uuids)):
+                            next = uuids.popleft()
+                            self._read_dev_info_state['next'] = next                         
+                            if (MetaWear._DEV_INFO[next] not in self.info):
+                                gatt_char = self.warble.find_characteristic(next)
+                                if (gatt_char == None):
+                                    handler(RuntimeError("Missing gatt char '%s'" % (next)))
+                                else:
+                                    gatt_char.read_value_async(self._read_dev_info_state['completed'])
+                            else:
+                                read_task()
+                        else:
+                            handler(None)
+
+                    def completed(value, error):
+                        if (error == None): 
+                            self.info[MetaWear._DEV_INFO[self._read_dev_info_state['next']]] = bytearray(value).decode('utf8')
+                            read_task()
+                        else:
+                            handler(error)
+
+                    self._read_dev_info_state = {
+                        'uuids': deque(MetaWear._DEV_INFO.keys()),
+                        'completed': completed,
+                        'read_task': read_task
+                    }
+
+                    read_task()
+
+        if 'firmware' in self.info: del self.info['firmware']
+        self.warble.connect_async(completed)
+
+    def connect(self, **kwargs):
+        """
+        Synchronous variant of `connect_async`
+        """
+        e = Event()
+        result = []
+
+        def completed(error):
+            result.append(error)
             e.set()
 
-        self.warble.connect_async(completed)
+        self.connect_async(completed)
         e.wait()
 
-        if (result != None):
-            raise result
-
-        if not self.in_metaboot_mode:
-            init_event = Event()
-            def init_handler(context, device, status):
-                self._init_status = status
-                init_event.set()
-
-            init_handler_fn = FnVoid_VoidP_VoidP_Int(init_handler)
-            libmetawear.mbl_mw_metawearboard_initialize(self.board, None, init_handler_fn)
-            init_event.wait()
-
-            if self._init_status != Const.STATUS_OK:
-                self.disconnect()
-                raise RuntimeError("Error initializing the API (%d)" % (self._init_status))
-
-            if 'serialize' not in kwargs or kwargs['serialize']:
-                self.serialize()
-        else:
-            uuids = deque(MetaWear._DEV_INFO.keys())
-            while(len(uuids)):
-                next = uuids.popleft()
-                if (MetaWear._DEV_INFO[next] not in self.info):
-                    gatt_char = self.warble.find_characteristic(next)
-                    if (gatt_char == None):
-                        raise RuntimeError("Missing gatt char '%s'" % (next))
-
-                    e.clear()
-                    results = []
-                    def completed(value, error):
-                        results.append(value)
-                        results.append(error)
-                        e.set()
-
-                    gatt_char.read_value_async(completed)
-                    e.wait()
-
-                    if results[1] == None:
-                        self.info[MetaWear._DEV_INFO[next]] = bytearray(results[0]).decode('utf8')
-                    else:
-                        raise results[1]
+        if (result[0] != None):
+            raise result[0]
 
     def _read_gatt_char(self, context, caller, ptr_gattchar, handler):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
