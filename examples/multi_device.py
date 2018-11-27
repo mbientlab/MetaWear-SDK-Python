@@ -1,4 +1,5 @@
 # usage: python multi_device [mac1] [mac2] ... [mac(n)]
+from __future__ import print_function
 from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from time import sleep
@@ -28,7 +29,7 @@ for i in range(len(sys.argv) - 1):
     states.append(State(d))
 
 for s in states:
-    print("configuring device")
+    print("Configuring device")
     libmetawear.mbl_mw_settings_set_connection_parameters(s.device.board, 7.5, 7.5, 0, 6000)
     sleep(1.5)
 

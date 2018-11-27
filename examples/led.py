@@ -1,4 +1,5 @@
 # usage: python led.py [mac]
+from __future__ import print_function
 from mbientlab.metawear import MetaWear, libmetawear
 from mbientlab.metawear.cbindings import *
 from time import sleep

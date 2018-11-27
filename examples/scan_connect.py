@@ -1,4 +1,5 @@
 # usage: python scan_connect.py
+from __future__ import print_function
 from mbientlab.metawear import MetaWear
 from mbientlab.metawear.cbindings import *
 from mbientlab.warble import * 
