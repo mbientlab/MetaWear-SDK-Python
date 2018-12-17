@@ -56,3 +56,56 @@ def parse_value(pointer, **kwargs):
             raise RuntimeError("Missing optional parameter 'n_elem' for parsing DataTypeId.DATA_ARRAY value")
     else:
         raise RuntimeError('Unrecognized data type id: ' + str(pointer.contents.type_id))
+
+from threading import Event
+
+def create_voidp(fn, **kwargs):
+    """
+    Helper function that converts a libmetawear FnVoid_VoidP_VoidP async functions into a synchronous one
+    @params:
+        fn          - Required  : `(FnVoid_VoidP_VoidP) -> void` function that wraps the call to a libmetawear FnVoid_VoidP_VoidP async function
+        resource    - Optional  : Name of the resource the fn is attempting to create
+        event       - Optional  : Event object used to block until completion.  If not provided, the function will instantiate its own Event object
+    """
+    e = kwargs['event'] if 'event' in kwargs else Event()
+
+    result = [None]
+    def handler(ctx, pointer):
+        result[0] = RuntimeError("Could not create " + (resource if 'resource' in kwarg else "resource") ) if pointer == None else pointer
+        e.set()
+
+    callback_wrapper = FnVoid_VoidP_VoidP(handler)
+    fn(callback_wrapper)
+    e.wait()
+
+    e.clear()
+    if (result[0] is RuntimeError):
+        raise result[0]
+    return result[0]
+
+def create_voidp_int(fn, **kwargs):
+    """
+    Helper function that converts a libmetawear FnVoid_VoidP_VoidP_Int async function into a synchronous one
+    @params:
+        fn          - Required  : `(FnVoid_VoidP_VoidP_Int) -> void` function that wraps the call to a libmetawear FnVoid_VoidP_VoidP_Int async function
+        resource    - Optional  : Name of the resource the fn is attempting to create
+        event       - Optional  : Event object used to block until completion.  If not provided, the function will instantiate its own Event object
+        is_error    - Optional  : `(int) -> bool` function used to check if the async function failed, checks if the int value is equal to Const.STATUS_OK if not specified
+    """
+    e = kwargs['event'] if 'event' in kwargs else Event()
+
+    result = [None]
+    def handler(ctx, pointer, status):
+        is_error = kwargs['is_error'] if 'is_error' in kwargs else lambda v: v != Const.STATUS_OK
+        if (is_error(status)):
+            result[0] = RuntimeError("Non-zero status returned (%d)" % (status))
+        e.set()
+
+    callback_wrapper = FnVoid_VoidP_VoidP_Int(handler)
+    fn(callback_wrapper)
+    e.wait()
+
+    e.clear()
+    if (result[0] is RuntimeError):
+        raise result[0]
+

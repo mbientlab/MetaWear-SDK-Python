@@ -1,4 +1,4 @@
-# usage: python led.py [mac]
+# usage: python calibrate.py [mac]
 from mbientlab.metawear import MetaWear, libmetawear, parse_value
 from mbientlab.metawear.cbindings import *
 from time import sleep

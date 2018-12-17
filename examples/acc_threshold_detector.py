@@ -1,17 +1,10 @@
-# usage: python acc_threshold_detector [mac]
+# usage: python acc_threshold_detector.py [mac]
 from __future__ import print_function
-from mbientlab.metawear import MetaWear, libmetawear, parse_value
+from mbientlab.metawear import MetaWear, libmetawear, parse_value, create_voidp_int, create_voidp
 from mbientlab.metawear.cbindings import *
 from time import sleep
 from threading import Event
-
-# CURRENT:
-# Sample accelerometer at 50Hz
-# Use the rms to combine X,Y,Z
-# Use the average to downsample to about 4Hz (averaging 8 samples)
-# Use the threshold detector to detect a bump 
-# Also log all the event and download it later
-        
+     
 print("Searching for device...")
 d = MetaWear(sys.argv[1])
 d.connect()
@@ -21,35 +14,6 @@ libmetawear.mbl_mw_settings_set_connection_parameters(d.board, 7.5, 7.5, 0, 6000
 sleep(1.0)
 
 e = Event()
-def create_voidp(create, resource):
-    result = [None]
-    def handler(ctx, pointer):
-        result[0] = RuntimeError("Could not create " + resource) if pointer == None else pointer
-        e.set()
-
-    callback_wrapper = FnVoid_VoidP_VoidP(handler)
-    create(callback_wrapper)
-    e.wait()
-
-    e.clear()
-    if (result[0] is RuntimeError):
-        raise result[0]
-    return result[0]
-
-def end_event_record(evt):
-    result = [None]
-    def handler(ctx, pointer, status):
-        if (status != Const.STATUS_OK):
-            result[0] = RuntimeError("Event recording returned a non-zero status (%d)" % (status))
-        e.set()
-
-    callback_wrapper = FnVoid_VoidP_VoidP_Int(handler)
-    libmetawear.mbl_mw_event_end_record(evt, None, callback_wrapper)
-    e.wait()
-
-    e.clear()
-    if (result[0] is RuntimeError):
-        raise result[0]
 
 try:
     # setup accelerometer (odr 50Hz and 2Gs)
@@ -61,24 +25,24 @@ try:
     acc_signal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(d.board)
 
     # create RMS - root mean square of acc X,Y,Z
-    rms = create_voidp(lambda fn: libmetawear.mbl_mw_dataprocessor_rms_create(acc_signal, None,  fn), "RMS")
+    rms = create_voidp(lambda fn: libmetawear.mbl_mw_dataprocessor_rms_create(acc_signal, None,  fn), resource = "RMS", event = e)
     print("RMS created")
 
     # setup averager - averages over 8 RMS samples @ 50Hz
-    avg = create_voidp(lambda fn: libmetawear.mbl_mw_dataprocessor_average_create(rms, 8, None, fn), "averager")
+    avg = create_voidp(lambda fn: libmetawear.mbl_mw_dataprocessor_average_create(rms, 8, None, fn), resource = "averager", event = e)
     print("Averager created")
 
     # setup event on avg - reset averager
     libmetawear.mbl_mw_event_record_commands(avg)
     libmetawear.mbl_mw_dataprocessor_average_reset(avg)
-    end_event_record(avg)
+    create_voidp_int(lambda fn: libmetawear.mbl_mw_event_end_record(avg, None, fn), event = e)
 
     # setup threshold detector - detect anything above 1
-    ths = create_voidp(lambda fn: libmetawear.mbl_mw_dataprocessor_threshold_create(avg, ThresholdMode.BINARY, 1.0, 0.0, None, fn), "threshold detector")
+    ths = create_voidp(lambda fn: libmetawear.mbl_mw_dataprocessor_threshold_create(avg, ThresholdMode.BINARY, 1.0, 0.0, None, fn), resource = "threshold detector", event = e)
     print("Threshold detector created")
 
     # setup logger - log the final signal of the averaged data
-    ths_logger = create_voidp(lambda fn: libmetawear.mbl_mw_datasignal_log(ths, None, fn), "threshold logger")
+    ths_logger = create_voidp(lambda fn: libmetawear.mbl_mw_datasignal_log(ths, None, fn), resource = "threshold logger", event = e)
     print("Threshold logger created")
     
     # start accelerometer and event logging
