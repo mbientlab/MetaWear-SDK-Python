@@ -9,7 +9,7 @@ import os
 import platform
 import sys
 
-machine = os.environ['MACHINE'] if 'MACHINE' in os.environ else ("arm" if "arm" in platform.machine() else ("x64" if sys.maxsize > 2**32 else "x86"))
+machine = os.environ['MACHINE'] if 'MACHINE' in os.environ else ("arm" if ("arm" in platform.machine()) or ("aarch64" in platform.machine()) else ("x64" if sys.maxsize > 2**32 else "x86"))
 root = os.path.dirname(os.path.abspath(__file__))
 dest = os.path.join("mbientlab", "metawear")
 
