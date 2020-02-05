@@ -1,5 +1,7 @@
 MetaWear Python SDK
 ###################
+Forked from mbientlab/MetaWear-SDK-Python by gabepierng
+
 Python SDK for creating MetaWear apps on the Linux platform.  This is a thin wrapper around the `MetaWear C++ API <https://github.com/mbientlab/MetaWear-SDK-Cpp>`_ so you will find the C++ 
 `documentation <https://mbientlab.com/cppdocs/latest/>`_ and `API reference <https://mbientlab.com/docs/metawear/cpp/latest/globals.html>`_ useful.  Also, check out the scripts in the 
 `examples <https://github.com/mbientlab/MetaWear-SDK-Python/tree/master/examples>`_ folder for full sample code.
