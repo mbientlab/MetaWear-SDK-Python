@@ -56,15 +56,27 @@ for s in states:
     libmetawear.mbl_mw_acc_enable_acceleration_sampling(s.device.board)
     libmetawear.mbl_mw_acc_start(s.device.board)
 
-sleep(5.0)
+sleep(20.0)
 
+# for s in states:
+#     libmetawear.mbl_mw_acc_stop(s.device.board)
+#     libmetawear.mbl_mw_acc_disable_acceleration_sampling(s.device.board)
+
+#     signal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(s.device.board)
+#     libmetawear.mbl_mw_datasignal_unsubscribe(signal)
+#     libmetawear.mbl_mw_debug_disconnect(s.device.board)
+
+print("Resetting devices")
+events = []
 for s in states:
-    libmetawear.mbl_mw_acc_stop(s.device.board)
-    libmetawear.mbl_mw_acc_disable_acceleration_sampling(s.device.board)
+    e = Event()
+    events.append(e)
 
-    signal = libmetawear.mbl_mw_acc_get_acceleration_data_signal(s.device.board)
-    libmetawear.mbl_mw_datasignal_unsubscribe(signal)
-    libmetawear.mbl_mw_debug_disconnect(s.device.board)
+    s.device.on_disconnect = lambda s: e.set()
+    libmetawear.mbl_mw_debug_reset(s.device.board)
+
+for e in events:
+    e.wait()
 
 print("Total Samples Received")
 for s in states:
