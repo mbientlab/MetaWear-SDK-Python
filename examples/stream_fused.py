@@ -103,7 +103,7 @@ for s in states:
 
 sleep(2.0)
 
-print("Resetting devices")
+print("Resetting devices\n")
 events = []
 for s in states:
     e = Event()
@@ -133,7 +133,7 @@ for s in states:
         for row in s.sensor_data:
             f.write('%d,%.3f,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f\n' % (row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]))
 
-    print("Data saved to \'sensor_data_" + trial_name + ".csv\'")
+    print("Data saved to \'" + filename + "\'\n")
 
 print("Total Samples Received")
 for s in states:
