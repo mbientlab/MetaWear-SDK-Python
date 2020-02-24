@@ -101,7 +101,7 @@ for s in states:
 for s in states:
     s.start()
 
-sleep(2.0)
+sleep(20.0)
 
 print("Resetting devices\n")
 events = []
