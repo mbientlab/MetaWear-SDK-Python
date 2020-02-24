@@ -85,7 +85,7 @@ for s in states:
     libmetawear.mbl_mw_gyro_bmi160_enable_rotation_sampling(s.device.board)
     libmetawear.mbl_mw_gyro_bmi160_start(s.device.board)
 
-sleep(2.0)
+sleep(10.0)
 
 # for s in states:
 #     libmetawear.mbl_mw_acc_stop(s.device.board)
@@ -121,7 +121,7 @@ for s in states:
         for row in s.sensor_data:
             f.write('%d,%.3f,%.3f,%.3f,%.3f\n' % (row[0], row[1], row[2], row[3], row[4]))
     i = i+1
-    
+
 print("Total Samples Received")
 for s in states:
     print("%s -> %d" % (s.device.address, s.samples))
