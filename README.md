@@ -10,9 +10,8 @@ SDK for creating MetaWear apps on the Linux platform.  This is a thin wrapper ar
 
 Also, check out the scripts in the [examples](https://github.com/mbientlab/MetaWear-SDK-Python/tree/master/examples) folder for sample code.
 
-> NOTES
-**This is not the pymetawear package.  That is a community developed Python SDK which you can find over** 
-`here <https://github.com/mbientlab-projects/pymetawear>`_ **.**
+> ADDITIONAL NOTES
+This is not the pymetawear package.  That is a community developed Python SDK which you can find over [here] (https://github.com/mbientlab-projects/pymetawear).
 
 ### Overview
 
