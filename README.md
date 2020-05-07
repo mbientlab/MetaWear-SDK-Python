@@ -26,7 +26,7 @@ The MetaWear hardware comes pre-loaded with a wirelessly upgradeable firmware, s
 - A linux or Windows 10+ machine with Bluetooth 4.0
 
 ### License
-See the [License](https://github.com/mbientlab/MetaWear-SDK-Python/blob/master/LICENSE)
+See the [License](https://github.com/mbientlab/MetaWear-SDK-Python/blob/master/LICENSE).
 
 ### Support
 Reach out to the [community](https://mbientlab.com/community/) if you encounter any problems, or just want to chat :)
