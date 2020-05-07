@@ -45,8 +45,8 @@ pip install metawear
 
 Import the MetaWear class and libmetawear variable from the metawear module and everything from the cbindings module.  
 ```python
-    from mbientlab.metawear import MetaWear, libmetawear
-    from mbientlab.metawear.cbindings import *
+from mbientlab.metawear import MetaWear, libmetawear
+from mbientlab.metawear.cbindings import *
 ```
 
 If you do not know the MAC address of your device, use ``PyWarble`` to scan for nearby devices.  
