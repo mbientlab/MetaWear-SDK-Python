@@ -10,8 +10,8 @@ SDK for creating MetaWear apps on the Linux platform.  This is a thin wrapper ar
 
 Also, check out the scripts in the [examples](https://github.com/mbientlab/MetaWear-SDK-Python/tree/master/examples) folder for sample code.
 
-> ADDITIONAL NOTES
-This is not the pymetawear package.  That is a community developed Python SDK which you can find over [here] (https://github.com/mbientlab-projects/pymetawear).
+> ADDITIONAL NOTES  
+This is not the pymetawear package.  That is a community developed Python SDK which you can find over [here](https://github.com/mbientlab-projects/pymetawear).
 
 ### Overview
 
@@ -23,6 +23,7 @@ The MetaWear hardware comes pre-loaded with a wirelessly upgradeable firmware, s
 
 ### Requirements
 - [MetaWear board](https://mbientlab.com/store/)
+- A linux or Windows 10+ machine with Bluetooth 4.0
 
 ### License
 See the [License](https://github.com/mbientlab/MetaWear-SDK-Python/blob/master/LICENSE)
@@ -34,7 +35,7 @@ Reach out to the [community](https://mbientlab.com/community/) if you encounter 
 
 ### Installation
 
-Use pip to install the metawear package.  It depends on `PyWarble <https://github.com/mbientlab/PyWarble>`_ so ensure your target environment has the necessary `dependencies <https://github.com/mbientlab/Warble#build>`_ installed.  
+Use pip to install the metawear package.  It depends on [PyWarble](https://github.com/mbientlab/PyWarble) so ensure your target environment has the necessary [dependencies](https://github.com/mbientlab/Warble#build) installed.  
 
 ```ruby
 pip install metawear
