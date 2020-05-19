@@ -1,7 +1,7 @@
 # MetaWear  SDK for Python by MBIENTLAB
 
 [![Platforms](https://img.shields.io/badge/platform-linux--64%20%7C%20win--32%20%7C%20win--64-lightgrey?style=flat)](https://github.com/mbientlab/MetaWear-SDK-Python)
-[![License](https://img.shields.io/cocoapods/l/MetaWear.svg?style=flat)](https://mbientlab.com/license)
+[![License](https://img.shields.io/cocoapods/l/MetaWear.svg?style=flat)](https://github.com/mbientlab/MetaWear-SDK-Python/blob/master/LICENSE.md)
 [![Version](https://img.shields.io/badge/python-3.5%20%7C%203.6%20%7C%203.7-blue?style=flat)](https://github.com/mbientlab/MetaWear-SDK-Python)
 
 ![alt tag](https://raw.githubusercontent.com/mbientlab/MetaWear-SDK-iOS-macOS-tvOS/master/Images/Metawear.png)
@@ -26,7 +26,7 @@ The MetaWear hardware comes pre-loaded with a wirelessly upgradeable firmware, s
 - A Linux or Windows 10+ machine with Bluetooth 4.0
 
 ### License
-See the [License](https://github.com/mbientlab/MetaWear-SDK-Python/blob/master/LICENSE).
+See the [License](https://github.com/mbientlab/MetaWear-SDK-Python/blob/master/LICENSE.md).
 
 ### Support
 Reach out to the [community](https://mbientlab.com/community/) if you encounter any problems, or just want to chat :)
