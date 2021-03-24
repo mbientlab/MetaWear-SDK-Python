@@ -39,9 +39,8 @@ Reach out to the [community](https://mbientlab.com/community/) if you encounter 
 ### Pre-Installation
 
 #### Python
-You need to make sure you have Python2 or Python3 installed as well as Pip. We don't cover this in this README, you can google-fu how to install Python and Pip.
+You need to make sure you have Python3 installed as well as Pip. We don't cover this in this README, you can google-fu how to install Python and Pip.
 ```
-python -V
 python3 -V
 ```
 
@@ -60,11 +59,10 @@ cd Python-3.9.0
 make -j 4
 sudo make altinstall
 ```
-It will be entirely up to you to figure out how you want to install Python and if you want to use Python 2 or 3.
+It will be entirely up to you to figure out how you want to install Python 3.
 
 You should also check where Python was installed:
 ```
-which python
 which python3
 ```
 
@@ -176,7 +174,7 @@ Or maybe (depends on your setup - see section above):
 /usr/bin/python3 -m pip install metawear
 ```
 
-If you install metawear with Python2, you will get an older version (we are no longer supporting Python2 but the older libs work). 
+If you install metawear with Python2, you will get an older version (we are no longer supporting Python2 since it has been deprecated. 
 We recommend using Python3 and our Pypi3 metawear package (this should automatically be resolved with pip).
 
 #### 2. Clone our Repository (local deps - developers only)
