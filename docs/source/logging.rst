@@ -18,6 +18,16 @@ Once we are done logging, simply call: ::
 
     libmetawear.mbl_mw_logging_stop(board)
 
+Note for the MMS
+----------------
+The MMS (MetaMotionS) board uses NAND flash memory to store data on the device itself. The NAND memory stores data in pages that are 512 entries large. When data is retrieved, it is retrieved in page sized chunks.
+
+Before doing a full download of the log memory on the MMS, the final set of data needs to be written to the NAND flash before it can be downloaded as a page. To do this, you must call the function: ::
+
+   libmetawear.mbl_mw_logging_flush_page(board)
+
+This should not be called if you are still logging data.
+
 Downloading Data
 ----------------
 When you are ready to retrieve the data, execute 
