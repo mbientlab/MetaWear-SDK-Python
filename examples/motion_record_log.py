@@ -1,4 +1,6 @@
-# usage: python stream_acc.py [mac1] [mac2] ... [mac(n)]
+# usage: python3 motion_record_log.py [mac1] [mac2] ... [mac(n)]
+# will only log acc data when there is significant motion with bmi160
+# won't do much on bmi270
 from __future__ import print_function
 from mbientlab.metawear import MetaWear, libmetawear, parse_value, create_voidp_int, create_voidp
 from mbientlab.metawear.cbindings import *
@@ -8,44 +10,47 @@ from threading import Event
 import platform
 import sys
 
-
 if sys.version_info[0] == 2:
     range = xrange
 
 class State:
+    # init
     def __init__(self, device):
         self.device = device
         self.samples = 0
         self.events = {"processor" : Event(), "event" : Event(), "log" : Event(), "download" : Event() }
-
+    # proc callback fxn
     def processor_created(self, context, signal):
         self.passthrough_signal = signal
         self.events["processor"].set()
-
+    # logger callback fxn
     def logger_ready(self, context, pointer):
         self.logger = pointer
         self.events["log"].set()
-
+    # event callback fxn
     def event_ready(self, context, board, status):
         print(status)
         self.events["event"].set()
-
+    # generic callback fxn
     def wont_be_used():
         print("nothing")
 
-
 states = []
+# connect
 for i in range(len(sys.argv) - 1):
     d = MetaWear(sys.argv[i + 1])
     d.connect()
     print("Connected to " + d.address)
     states.append(State(d))
 
+# configure
 for s in states:
+    # setup callback pointers
     processor_created_fn= FnVoid_VoidP_VoidP(s.processor_created)
     logger_created_fn= FnVoid_VoidP_VoidP(s.logger_ready)
     event_created_fn = FnVoid_VoidP_VoidP_Int(s.event_ready)
 
+    # ble config
     print("Configuring device")
     libmetawear.mbl_mw_settings_set_connection_parameters(s.device.board, 7.5, 7.5, 0, 6000)
     sleep(1.5)
@@ -71,12 +76,13 @@ for s in states:
     libmetawear.mbl_mw_datasignal_log(s.passthrough_signal, None, logger_created_fn)
     s.events["log"].wait()
 
+    # wait 1s
     sleep(1.0)
 
     # setup any motion
     libmetawear.mbl_mw_acc_bosch_set_any_motion_count(s.device.board, 2)
     libmetawear.mbl_mw_acc_bosch_set_any_motion_threshold(s.device.board, 0.1)
-    libmetawear.mbl_mw_acc_bosch_write_motion_config(s.device.board)
+    libmetawear.mbl_mw_acc_bosch_write_motion_config(s.device.board, AccBoschMotion.ANYMOTION)
     print("setup bmi160 motion recognition")
 
     # get motion signal    
@@ -121,7 +127,9 @@ print("9 min")
 sleep(60.0)
 print("10 min")
 
+# tear down
 for s in states:
+    # setup logging and acc
     print("Stop")
     libmetawear.mbl_mw_acc_stop(s.device.board)
     libmetawear.mbl_mw_acc_disable_acceleration_sampling(s.device.board)
@@ -129,9 +137,11 @@ for s in states:
     libmetawear.mbl_mw_acc_bosch_stop(s.device.board)
     libmetawear.mbl_mw_logging_stop(s.device.board)
 
+    # wait 1s
     print("Downloading data")
     sleep(1.0)
 
+    # download handlers
     s.events["download"].clear()
     def progress_update_handler(context, entries_left, total_entries):
         if (entries_left == 0):

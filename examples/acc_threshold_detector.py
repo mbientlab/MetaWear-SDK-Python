@@ -1,4 +1,4 @@
-# usage: python acc_threshold_detector.py [mac]
+# usage: python3 acc_threshold_detector.py [mac]
 from __future__ import print_function
 from mbientlab.metawear import MetaWear, libmetawear, parse_value, create_voidp_int, create_voidp
 from mbientlab.metawear.cbindings import *
@@ -54,23 +54,33 @@ try:
     print("Logging data for 10s")
     sleep(10.0)
     
+    # stop acc
     libmetawear.mbl_mw_acc_stop(d.board)
     libmetawear.mbl_mw_acc_disable_acceleration_sampling(d.board)
+    # stop logging
     libmetawear.mbl_mw_logging_stop(d.board)
-
+    # flush for mms
+    libmetawear.mbl_mw_logging_flush_page(d.board)
+    
+    # download handler fxn
     def progress_update_handler(context, entries_left, total_entries):
         if (entries_left == 0):
             e.set()
-
+    # download handler fxn ptr
     fn_wrapper = FnVoid_VoidP_UInt_UInt(progress_update_handler)
     download_handler= LogDownloadHandler(context = None, \
         received_progress_update = fn_wrapper, \
         received_unknown_entry = cast(None, FnVoid_VoidP_UByte_Long_UByteP_UByte), \
         received_unhandled_entry = cast(None, FnVoid_VoidP_DataP))
-
     callback = FnVoid_VoidP_DataP(lambda ctx, p: print("threshold crossed: {epoch: %d, value: %s}" % (p.contents.epoch, parse_value(p))))
+    
+    # subscribe to logger
     libmetawear.mbl_mw_logger_subscribe(ths_logger, None, callback)
+    
+    # download
     libmetawear.mbl_mw_logging_download(d.board, 0, byref(download_handler))
+    
+    # wait until done
     e.wait()
 
 except RuntimeError as err:
@@ -78,7 +88,8 @@ except RuntimeError as err:
 finally:
     e.clear()
     print("Resetting device")
-    
+    sleep(1.0)
     d.on_disconnect = lambda status: e.set()
+    # reset
     libmetawear.mbl_mw_debug_reset(d.board)
     e.wait()

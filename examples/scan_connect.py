@@ -1,4 +1,5 @@
-# usage: python scan_connect.py
+# Requires: sudo pip3 install metawear
+# usage: sudo python3 scan_connect.py
 from __future__ import print_function
 from mbientlab.metawear import MetaWear
 from mbientlab.metawear.cbindings import *

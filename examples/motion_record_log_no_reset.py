@@ -1,4 +1,6 @@
-# usage: python stream_acc.py [mac1] [mac2] ... [mac(n)]
+# usage: python3 motion_record_log_no_reset.py [mac1] [mac2] ... [mac(n)]
+# will only log acc data when there is significant motion with bmi160
+# won't do much on bmi270
 from __future__ import print_function
 from mbientlab.metawear import MetaWear, libmetawear, parse_value, create_voidp_int, create_voidp
 from mbientlab.metawear.cbindings import *
@@ -8,6 +10,7 @@ from threading import Event
 import platform
 import sys
 
+# SEE MOTION_RECORD_LOG.PY
 
 if sys.version_info[0] == 2:
     range = xrange
