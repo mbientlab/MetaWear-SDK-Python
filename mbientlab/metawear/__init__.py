@@ -15,6 +15,7 @@ libmetawear= CDLL(_so_path)
 init_libmetawear(libmetawear)
 
 from .metawear import MetaWear
+from .metawear import MetaWearUSB
 
 _value_parsers = {
     DataTypeId.UINT32: lambda p: cast(p.contents.value, POINTER(c_uint)).contents.value,
