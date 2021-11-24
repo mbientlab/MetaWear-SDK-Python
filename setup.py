@@ -57,7 +57,7 @@ so_pkg_data = ['libmetawear.so']
 setup(
     name='metawear',
     packages=['mbientlab', 'mbientlab.metawear'],
-    version='1.0.2',
+    version='1.0.3',
     description='Python bindings for the MetaWear C++ SDK by MbientLab',
     long_description=open(os.path.join(os.path.dirname(__file__), "README.md")).read(),
     package_data={'mbientlab.metawear': so_pkg_data},
