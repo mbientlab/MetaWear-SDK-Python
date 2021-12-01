@@ -19,7 +19,11 @@ class MetaWearClean(clean):
         if os.path.isfile(bindings):
             os.remove(bindings)
 
-        if (platform.system() == 'Linux'):
+        if (platform.system() == 'Windows'):
+            dll = os.path.join(dest, "MetaWear.Win32.dll")
+            if os.path.isfile(dll):
+                os.remove(dll)
+        elif (platform.system() == 'Linux'):
             for f in os.listdir(dest):
                 if (f.startswith("libmetawear.so")):
                     os.remove(os.path.join(dest, f))
@@ -34,14 +38,19 @@ class MetaWearBuild(build_py):
     def run(self):        
         cpp_sdk = os.path.join(root, 'MetaWear-SDK-Cpp')
         system = platform.system()
-        dist_dir = os.path.join(cpp_sdk, 'dist', 'release', 'lib', machine)
+        dist_dir = os.path.join(cpp_sdk, 'dist', 'release', 'lib', "Win32" if machine == "x86" and system == "Windows" else machine)
 
         if os.path.exists(os.path.join(root, '.git')):
             status = call(["git", "submodule", "update", "--init"], cwd=root, stderr=STDOUT)
             if (status != 0):
                 raise RuntimeError("Could not init git submodule")
 
-        if (system == 'Linux'):
+        if (system == 'Windows'):
+            if (call(["MSBuild.exe", "MetaWear.Win32.vcxproj", "/p:Platform=%s" % machine, "/p:Configuration=Release"], cwd=cpp_sdk, stderr=STDOUT) != 0):
+                raise RuntimeError("Failed to compile MetaWear.dll")
+
+            move(os.path.join(dist_dir, "MetaWear.Win32.dll"), dest)
+        elif (system == 'Linux'):
             status = call(["make", "-C", "MetaWear-SDK-Cpp", "OPT_FLAGS=-Wno-strict-aliasing", "-j%d" % (cpu_count())], cwd=root, stderr=STDOUT)
             if (status != 0):
                 raise RuntimeError("Failed to compile C++ SDK")
@@ -53,11 +62,11 @@ class MetaWearBuild(build_py):
         copy2(os.path.join(cpp_sdk, 'bindings', 'python', 'mbientlab', 'metawear', 'cbindings.py'), dest)
         build_py.run(self)
 
-so_pkg_data = ['libmetawear.so']
+so_pkg_data = ['libmetawear.so'] if platform.system() == 'Linux' else ['MetaWear.Win32.dll']
 setup(
     name='metawear',
     packages=['mbientlab', 'mbientlab.metawear'],
-    version='1.0.3',
+    version='1.0.4',
     description='Python bindings for the MetaWear C++ SDK by MbientLab',
     long_description=open(os.path.join(os.path.dirname(__file__), "README.md")).read(),
     package_data={'mbientlab.metawear': so_pkg_data},
@@ -79,6 +88,7 @@ setup(
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'Operating System :: POSIX :: Linux',
+        'Operating System :: Microsoft :: Windows :: Windows 10',
         'Programming Language :: Python :: 3',
     ]
 )
