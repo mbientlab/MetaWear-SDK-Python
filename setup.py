@@ -50,7 +50,7 @@ class MetaWearBuild(build_py):
                 if (call(["MSBuild.exe", "MetaWear.Win32.vcxproj", "/p:Platform=%s" % machine, "/p:Configuration=Release"], cwd=cpp_sdk, stderr=STDOUT) != 0):
                     raise RuntimeError("Failed to compile MetaWear.dll")
 
-            move(os.path.join(dist_dir, "MetaWear.Win32.dll"), dest)
+            copy2(os.path.join(dist_dir, "MetaWear.Win32.dll"), dest)
         elif (system == 'Linux'):
             status = call(["make", "-C", "MetaWear-SDK-Cpp", "OPT_FLAGS=-Wno-strict-aliasing", "-j%d" % (cpu_count())], cwd=root, stderr=STDOUT)
             if (status != 0):
