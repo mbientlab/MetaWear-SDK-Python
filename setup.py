@@ -46,8 +46,9 @@ class MetaWearBuild(build_py):
                 raise RuntimeError("Could not init git submodule")
 
         if (system == 'Windows'):
-            if (call(["MSBuild.exe", "MetaWear.Win32.vcxproj", "/p:Platform=%s" % machine, "/p:Configuration=Release"], cwd=cpp_sdk, stderr=STDOUT) != 0):
-                raise RuntimeError("Failed to compile MetaWear.dll")
+            if not os.path.exists(os.path.join(dist_dir, "MetaWear.Win32.dll")):
+                if (call(["MSBuild.exe", "MetaWear.Win32.vcxproj", "/p:Platform=%s" % machine, "/p:Configuration=Release"], cwd=cpp_sdk, stderr=STDOUT) != 0):
+                    raise RuntimeError("Failed to compile MetaWear.dll")
 
             move(os.path.join(dist_dir, "MetaWear.Win32.dll"), dest)
         elif (system == 'Linux'):
