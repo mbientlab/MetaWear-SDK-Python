@@ -5,6 +5,7 @@ from ctypes import *
 from distutils.version import LooseVersion
 from mbientlab.warble import Gatt
 from threading import Event
+from types import SimpleNamespace
 
 import copy
 import errno
@@ -15,6 +16,9 @@ import requests
 import sys
 import time
 import uuid
+import serial
+import serial.tools.list_ports as list_ports
+import threading
 
 _is_linux = platform.system() == 'Linux'
 
@@ -47,6 +51,200 @@ def _download_file(url, dest):
             f.write(content)
         return content
 
+class MetaWearUSB(object):
+    """Enables USB control of MetaWear devices via a warble-like abstraction"""
+
+    GATT_DIS =                  '0000180A-0000-1000-8000-00805f9b34fb'
+    GATT_MW_CHAR_COMMAND =      '326a9001-85cb-9195-d9dd-464cfbbae75a'
+    GATT_MW_CHAR_NOTIFICATION = '326a9006-85cb-9195-d9dd-464cfbbae75a'
+
+    @staticmethod
+    def scan():
+        """List MetaWear devices attached to USB"""
+        devices = []
+        for port in list_ports.grep('VID:PID=1915:D978'):
+            name = 'MetaMotionS' if port.product is None else port.product
+            mac = ':'.join(port.serial_number[i:i+2] for i in range(0,len(port.serial_number),2))
+            devices.append({'address': mac, 'name': name, 'path': port.device})
+        return devices
+
+    @staticmethod
+    def _device_path(address):
+        """Returns OS path of device with given address if attached to USB"""
+        devices = MetaWearUSB.scan()
+        for d in devices:
+            if address == d['address']:
+                return d['path']
+        return None
+
+    def __init__(self, address):
+        self._notify_handler = None
+        self._disconnect_handler = None
+
+        self.address = address
+        self.ser = None
+
+    def connect_async(self, handler):
+        """Connect to device by establishing USB serial comm link"""
+        status = None
+        try:
+            self.ser = serial.Serial(MetaWearUSB._device_path(self.address), 1000000, timeout=.1)
+            time.sleep(0.10)
+
+            self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+
+            # read device info via identification command
+            self.ser.write("?\n".encode())
+            self.ser.flush()
+            id_str = self.ser.readline().strip().decode()
+            self.info = dict(zip(('manufacturer','model_name','model','hardware','firmware','serial'), id_str.split(" ")))
+
+            self._read_poll = True
+            self._read_thread = threading.Thread(target=self._read_poller, daemon=True)
+
+            self._write_disconnect = False
+            self._write_poll = True
+            self._write_resp_handler = None
+            self._write_resp_event = Event() 
+            self._write_thread = threading.Thread(target=self._write_poller, daemon=True)
+
+            self._read_thread.start()
+            self._write_thread.start()
+
+        except serial.SerialException:
+            self.ser = None
+            status = Const.STATUS_ERROR_TIMEOUT
+
+        handler(status)
+
+    def __del__(self):
+        self.disconnect()
+
+    @property
+    def is_enumerated(self):
+        """True if the device is attached via USB, enumerated by the OS and ready for connections."""
+        return MetaWearUSB._device_path(self.address) is not None
+
+    @property
+    def is_connected(self):
+        """True if USB serial communication is established with the device."""
+        return self.ser is not None and self.ser.is_open
+
+    def disconnect(self):
+        """Disconnect from device by closing the USB serial connection."""
+        if self.is_connected:
+            if self._read_poll:
+                self._read_poll = False
+                self._read_thread.join()
+
+            if self._write_poll:
+                self._write_poll = False
+                self._write_resp_event.set()
+                self._write_thread.join()
+
+            self.ser.close()
+            self.ser = None
+        
+        if self._disconnect_handler is not None:
+            self._disconnect_handler(Const.STATUS_OK)
+
+    def _write(self, cmd_str):
+        """Encodes MetaWear command with serial line protocol."""
+        bin_str = [0x1f, len(cmd_str)] + cmd_str + [ord('\n')]
+        self.ser.write(bin_str)
+        if cmd_str == list(map(ord, '\xfe\x06')): # disconnect cmd, flush and close serial port
+            self._write_disconnect = True
+            self._write_resp_event.set()
+
+    def _write_async(self, cmd_str, handler):
+        """Async write with response"""
+        self._write(cmd_str)
+        self._write_resp_handler = handler
+        self._write_resp_event.set()
+
+    def _write_without_resp_async(self, cmd_str, handler):
+        """Async write without response"""
+        self._write(cmd_str)
+        handler(None)
+    
+    def service_exists(self, uuid):
+        """Checks supported GATT services"""
+        if uuid.lower() == MetaWear.GATT_SERVICE or uuid.lower() == MetaWearUSB.GATT_DIS:
+            return True
+        return False
+
+    def find_characteristic(self, uuid):
+        """Find GATT Characteristic by UUID"""
+        if uuid.lower() == MetaWear.GATT_SERVICE or uuid.lower() == MetaWearUSB.GATT_MW_CHAR_COMMAND:
+            return SimpleNamespace(write_async = self._write_async,
+                                   write_without_resp_async = self._write_without_resp_async)
+        if uuid.lower() == MetaWearUSB.GATT_MW_CHAR_NOTIFICATION:
+            return SimpleNamespace(enable_notifications_async = lambda x: x(None),
+                                   on_notification_received = self.on_notification_received)
+        if uuid.lower() in MetaWear._DEV_INFO.keys():
+            return SimpleNamespace(read_value_async = lambda x: x(self.info[MetaWear._DEV_INFO[uuid]].encode(), None))
+        return None
+
+    def on_notification_received(self, handler):
+        """Registers notification received handler"""
+        self._notify_handler = handler
+
+    def on_disconnect(self, handler):
+        """Registers disconnect handler"""
+        self._disconnect_handler = handler
+
+    def _bin_cmd_decode(self, c):
+        """Decodes MetaWear event from line protocol character by character"""
+        if self._cmd_started:
+            if self._cmd_len == 0:
+                self._cmd_len = ord(c)
+            elif self._cmd_recv_len < self._cmd_len:
+                self._cmd_recv_len += 1
+                self._cmd_buffer += c
+            elif c == b'\n':
+                self._cmd_started = False
+                return self._cmd_buffer
+        elif c == b'\x1f':
+            self._cmd_started = True
+            self._cmd_len = 0
+            self._cmd_recv_len = 0
+            self._cmd_buffer = []
+        return []
+
+    def _read_poller(self):
+        """Read polling loop to convert synchronous serial operations to async notifications."""
+        self._cmd_started = False
+        while self._read_poll:
+            try:
+                c = self.ser.read()
+            except serial.SerialException:
+                self._read_poll = False
+                self.disconnect()
+                return
+
+            if len(c) < 1:
+                continue
+            cmd = self._bin_cmd_decode(c)
+            if len(cmd) > 0:
+                if self._notify_handler is not None:
+                    self._notify_handler(cmd)
+
+    def _write_poller(self):
+        """Write poller enabling async writes and write response callbacks."""
+        while self._write_poll:
+            self._write_resp_event.wait() 
+            self._write_resp_event.clear()
+            if not self._write_poll:
+                return
+            self.ser.flush()
+            if self._write_resp_handler is not None:
+                self._write_resp_handler(None)
+                self._write_resp_handler = None
+            if self._write_disconnect:
+                self._write_poll = False
+                self.disconnect()
+        
 class MetaWear(object):
     GATT_SERVICE = "326a9000-85cb-9195-d9dd-464cfbbae75a"
     _DEV_INFO = {
@@ -74,6 +272,9 @@ class MetaWear(object):
         if (_is_linux and 'hci_mac' in kwargs):
             args['hci'] = kwargs['hci_mac']
         self.warble = Gatt(address.upper(), **args)
+        self.conn = self.warble
+
+        self.usb = MetaWearUSB(address.upper())
 
         self.info = {}
         self.write_queue = deque([])
@@ -102,20 +303,23 @@ class MetaWear(object):
 
     @property
     def is_connected(self):
-        return self.warble.is_connected
+        """
+        True if the MetaWear board is connected.
+        """
+        return self.conn.is_connected
 
     @property
     def in_metaboot_mode(self):
         """
         True if the board is in MetaBoot mode.  The only permitted operation for MetaBoot boards is to update the firmware
         """
-        return self.warble.service_exists("00001530-1212-efde-1523-785feabcd123")
+        return self.conn.service_exists("00001530-1212-efde-1523-785feabcd123")
 
     def disconnect(self):
         """
         Disconnects from the MetaWear board
         """
-        self.warble.disconnect()
+        self.conn.disconnect()
 
     def connect_async(self, handler, **kwargs):
         """
@@ -149,7 +353,7 @@ class MetaWear(object):
                             next = uuids.popleft()
                             self._read_dev_info_state['next'] = next                         
                             if (MetaWear._DEV_INFO[next] not in self.info):
-                                gatt_char = self.warble.find_characteristic(next)
+                                gatt_char = self.conn.find_characteristic(next)
                                 if (gatt_char == None):
                                     handler(RuntimeError("Missing gatt char '%s'" % (next)))
                                 else:
@@ -175,7 +379,9 @@ class MetaWear(object):
                     read_task()
 
         if 'firmware' in self.info: del self.info['firmware']
-        self.warble.connect_async(completed)
+        
+        self.conn = self.usb if self.usb.is_enumerated else self.warble
+        self.conn.connect_async(completed)
 
     def connect(self, **kwargs):
         """
@@ -196,7 +402,8 @@ class MetaWear(object):
 
     def _read_gatt_char(self, context, caller, ptr_gattchar, handler):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
-        gatt_char = self.warble.find_characteristic(uuid)
+
+        gatt_char = self.conn.find_characteristic(uuid)
 
         if (gatt_char == None):
             print("gatt char '%s' does not exist" % (uuid))
@@ -229,7 +436,7 @@ class MetaWear(object):
                 next[0].write_without_resp_async(next[1], completed)
 
     def _write_gatt_char(self, context, caller, write_type, ptr_gattchar, value, length):
-        gatt_char = self.warble.find_characteristic(_gattchar_to_string(ptr_gattchar.contents))
+        gatt_char = self.conn.find_characteristic(_gattchar_to_string(ptr_gattchar.contents))
         buffer = [value[i] for i in range(0, length)]
 
         self.write_queue.append([gatt_char, buffer, write_type])
@@ -238,7 +445,7 @@ class MetaWear(object):
         
     def _enable_notifications(self, context, caller, ptr_gattchar, handler, ready):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
-        gatt_char = self.warble.find_characteristic(uuid)
+        gatt_char = self.conn.find_characteristic(uuid)
 
         if (gatt_char == None):
             ready(caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
@@ -258,7 +465,7 @@ class MetaWear(object):
             if (self.on_disconnect != None):
                 self.on_disconnect(status)
             handler(caller, status)
-        self.warble.on_disconnect(event_handler)
+        self.conn.on_disconnect(event_handler)
 
     def _download_firmware(self, version=None):
         firmware_root = os.path.join(self.cache, "firmware")

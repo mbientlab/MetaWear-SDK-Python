@@ -70,7 +70,7 @@ for s in states:
     libmetawear.mbl_mw_gyro_bmi270_stop(s.device.board)
     libmetawear.mbl_mw_gyro_bmi270_disable_rotation_sampling(s.device.board)
 
-    gyro = llibmetawear.mbl_mw_gyro_bmi270_get_packed_rotation_data_signal(s.device.board)
+    gyro = libmetawear.mbl_mw_gyro_bmi270_get_packed_rotation_data_signal(s.device.board)
     libmetawear.mbl_mw_datasignal_unsubscribe(gyro)
     
     libmetawear.mbl_mw_debug_disconnect(s.device.board)
