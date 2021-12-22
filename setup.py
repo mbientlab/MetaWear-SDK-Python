@@ -77,7 +77,8 @@ setup(
     author_email="hello@mbientlab.com",
     install_requires=[
         'warble >= 1.1, < 2.0',
-        'requests'
+        'requests',
+        'pyserial'
     ],
     cmdclass={
         'build_py': MetaWearBuild,
