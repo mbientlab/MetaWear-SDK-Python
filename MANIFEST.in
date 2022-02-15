@@ -5,7 +5,6 @@ graft MetaWear-SDK-Cpp
 prune MetaWear-SDK-Cpp/bindings/swift
 prune MetaWear-SDK-Cpp/cppdocs
 prune MetaWear-SDK-Cpp/build
-prune MetaWear-SDK-Cpp/dist
 prune MetaWear-SDK-Cpp/Debug
 prune MetaWear-SDK-Cpp/Release
 prune MetaWear-SDK-Cpp/x64
@@ -22,5 +21,10 @@ global-exclude *.py[co]
 global-exclude *.d
 global-exclude *.o
 global-exclude *.so*
-global-exclude *.dll
+global-exclude *.exp
+global-exclude *.iobj
+global-exclude *.ipdb
+global-exclude *.lib
+global-exclude *.pdb
+global-exclude *.tar
 global-exclude *.a
