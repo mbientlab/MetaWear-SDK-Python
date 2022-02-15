@@ -8,7 +8,9 @@ prune MetaWear-SDK-Cpp/build
 prune MetaWear-SDK-Cpp/Debug
 prune MetaWear-SDK-Cpp/Release
 prune MetaWear-SDK-Cpp/x64
-recursive-exclude MetaWear-SDK-Cpp/bindings/javascript cbindings.js
+prune MetaWear-SDK-Cpp/c-binding-generator
+prune MetaWear-SDK-Cpp/test
+prune MetaWear-SDK-Cpp/.git
 
 graft mbientlab
 recursive-exclude mbientlab/metawear cbindings.py
