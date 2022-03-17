@@ -58,6 +58,10 @@ class MetaWearUSB(object):
     GATT_MW_CHAR_COMMAND =      '326a9001-85cb-9195-d9dd-464cfbbae75a'
     GATT_MW_CHAR_NOTIFICATION = '326a9006-85cb-9195-d9dd-464cfbbae75a'
 
+    SERIAL_XFER_SIZE =          1024
+    SERIAL_BYTE_START =         b'\x1f'
+    SERIAL_BYTE_STOP =          b'\n'
+
     @staticmethod
     def scan():
         """List MetaWear devices attached to USB"""
@@ -202,10 +206,10 @@ class MetaWearUSB(object):
             elif self._cmd_recv_len < self._cmd_len:
                 self._cmd_recv_len += 1
                 self._cmd_buffer += c
-            elif c == b'\n':
+            elif c == MetaWearUSB.SERIAL_BYTE_STOP:
                 self._cmd_started = False
                 return self._cmd_buffer
-        elif c == b'\x1f':
+        elif c == MetaWearUSB.SERIAL_BYTE_START:
             self._cmd_started = True
             self._cmd_len = 0
             self._cmd_recv_len = 0
@@ -217,18 +221,20 @@ class MetaWearUSB(object):
         self._cmd_started = False
         while self._read_poll:
             try:
-                c = self.ser.read()
+                read_len = max(1, min(MetaWearUSB.SERIAL_XFER_SIZE, self.ser.in_waiting))
+                line_bytes = self.ser.read(read_len)
             except serial.SerialException:
                 self._read_poll = False
                 self.disconnect()
                 return
 
-            if len(c) < 1:
+            if len(line_bytes) < 1:
                 continue
-            cmd = self._bin_cmd_decode(c)
-            if len(cmd) > 0:
-                if self._notify_handler is not None:
-                    self._notify_handler(cmd)
+            for i in range(len(line_bytes)):
+                cmd = self._bin_cmd_decode(line_bytes[i:i+1])
+                if len(cmd) > 0:
+                    if self._notify_handler is not None:
+                        self._notify_handler(cmd)
 
     def _write_poller(self):
         """Write poller enabling async writes and write response callbacks."""
