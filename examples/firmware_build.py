@@ -10,7 +10,7 @@ import sys
 # connect
 m = MetaWear(sys.argv[1])
 m.connect()
-print("Connected")
+print("Connected to " + m.address + " over " + ("USB" if m.usb.is_connected else "BLE"))
 
 # get board info
 size = c_uint(0)

@@ -13,7 +13,7 @@ d = MetaWear(sys.argv[1])
 
 # connect to macc
 d.connect()
-print("Connected to " + d.address)
+print("Connected to " + d.address + " over " + ("USB" if d.usb.is_connected else "BLE"))
 e = Event()
 
 # create callback

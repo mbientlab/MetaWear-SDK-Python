@@ -65,7 +65,7 @@ class State:
 for i in range(len(argv) - 1):
     d = MetaWear(argv[i + 1])
     d.connect()
-    print("Connected to " + d.address)
+    print("Connected to " + d.address + " over " + ("USB" if d.usb.is_connected else "BLE"))
     states.append(State(d))
 
 # configure

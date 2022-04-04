@@ -10,7 +10,7 @@ import sys
 # connect
 device = MetaWear(sys.argv[1])
 device.connect()
-print("Connected")
+print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
 
 # create led pattern
 pattern= LedPattern(repeat_count= Const.LED_REPEAT_INDEFINITELY)
