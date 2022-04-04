@@ -13,7 +13,7 @@ event = Event()
 # connect
 device = MetaWear(sys.argv[1])
 device.connect()
-print("Connected to " + device.address)
+print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
 sleep(1.0)
 
 # remove macros    
