@@ -14,7 +14,7 @@ if sys.version_info[0] == 2:
 # connect
 metawear = MetaWear(sys.argv[1])
 metawear.connect()
-print("Connected")
+print("Connected to " + metawear.address + " over " + ("USB" if metawear.usb.is_connected else "BLE"))
 
 # setup
 e = Event()

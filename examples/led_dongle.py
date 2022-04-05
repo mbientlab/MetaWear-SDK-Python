@@ -11,7 +11,7 @@ import sys
 # Add hci_mac to the setup to specify which dongle to use
 device = MetaWear(sys.argv[1], hci_mac="B8:27:EB:F2:61:2E")
 device.connect()
-print("Connected")
+print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
 
 # create led pattern
 pattern= LedPattern(repeat_count= Const.LED_REPEAT_INDEFINITELY)

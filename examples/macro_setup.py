@@ -13,7 +13,7 @@ device = MetaWear(sys.argv[1])
 
 # connect
 device.connect()
-print("Connected to " + device.address)
+print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
 
 # setup events
 e = Event()

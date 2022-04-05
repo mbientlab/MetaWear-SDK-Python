@@ -67,7 +67,7 @@ so_pkg_data = ['libmetawear.so'] if platform.system() == 'Linux' else ['MetaWear
 setup(
     name='metawear',
     packages=['mbientlab', 'mbientlab.metawear'],
-    version='1.0.6',
+    version='1.0.7',
     description='Python bindings for the MetaWear C++ SDK by MbientLab',
     long_description=open(os.path.join(os.path.dirname(__file__), "README.rst")).read(),
     package_data={'mbientlab.metawear': so_pkg_data},

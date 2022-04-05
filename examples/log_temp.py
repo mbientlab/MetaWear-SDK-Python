@@ -11,7 +11,7 @@ import sys
 print("Searching for device...")
 d = MetaWear(sys.argv[1])
 d.connect()
-print("Connected to " + d.address)
+print("Connected to " + d.address + " over " + ("USB" if d.usb.is_connected else "BLE"))
 
 try:
     # setup events

@@ -8,7 +8,7 @@ from threading import Event
 print("Searching for device...")
 d = MetaWear(sys.argv[1])
 d.connect()
-print("Connected to " + d.address)
+print("Connected to " + d.address + " over " + ("USB" if d.usb.is_connected else "BLE"))
 print("Configuring device")
 libmetawear.mbl_mw_settings_set_connection_parameters(d.board, 7.5, 7.5, 0, 6000)
 sleep(1.0)
