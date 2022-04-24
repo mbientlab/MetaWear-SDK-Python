@@ -76,7 +76,7 @@ so_pkg_data = ['libmetawear.so'] if platform.system() == 'Linux' else ['MetaWear
 setup(
     name='metawear',
     packages=['mbientlab', 'mbientlab.metawear'],
-    version='1.0.7',
+    version='1.0.8',
     description='Python bindings for the MetaWear C++ SDK by MbientLab',
     long_description=open(os.path.join(os.path.dirname(__file__), "README.rst")).read(),
     package_data={'mbientlab.metawear': so_pkg_data},
@@ -85,7 +85,7 @@ setup(
     author='MbientLab',
     author_email="hello@mbientlab.com",
     install_requires=[
-        'warble >= 1.2.8, < 2.0',
+        'warble >= 1.2.9, < 2.0',
         'requests',
         'pyserial'
     ],
