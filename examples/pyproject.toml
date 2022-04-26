@@ -1,12 +1,15 @@
 [tool.poetry]
-name = "mbientlab-examples"
+name = "metawear.examples"
+
 version = "0.1.0"
-description = ""
-authors = ["Alois Klink <alois@nquiringminds.com>"]
+description = "Examples for the MetaWear-SDK-Python"
+authors = ["MbientLab <hello@mbientlab.com>"]
+repository = "https://github.com/nqminds/MetaWear-SDK-Python.git"
+homepage = "https://github.com/nqminds/MetaWear-SDK-Python"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-metawear = { path = "../" }
+python = ">=3.5"
+metawear = { path = "../", develop = true }
 
 [tool.poetry.dev-dependencies]
 
