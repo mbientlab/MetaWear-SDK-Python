@@ -8,8 +8,9 @@ repository = "https://github.com/nqminds/MetaWear-SDK-Python.git"
 homepage = "https://github.com/nqminds/MetaWear-SDK-Python"
 
 [tool.poetry.dependencies]
-python = ">=3.5"
+python = "^3.7"
 metawear = { path = "../", develop = true }
+bleak = "^0.14.3"
 
 [tool.poetry.dev-dependencies]
 

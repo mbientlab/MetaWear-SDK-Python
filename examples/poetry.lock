@@ -1,26 +1,60 @@
 [[package]]
-name = "certifi"
-version = "2021.10.8"
-description = "Python package for providing Mozilla's CA Bundle."
+name = "bleak"
+version = "0.14.3"
+description = "Bluetooth Low Energy platform Agnostic Klient"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+bleak-winrt = {version = ">=1.1.1", markers = "platform_system == \"Windows\""}
+dbus-next = {version = "*", markers = "platform_system == \"Linux\""}
+pyobjc-core = {version = "*", markers = "platform_system == \"Darwin\""}
+pyobjc-framework-CoreBluetooth = {version = "*", markers = "platform_system == \"Darwin\""}
+pyobjc-framework-libdispatch = {version = "*", markers = "platform_system == \"Darwin\""}
+
+[[package]]
+name = "bleak-winrt"
+version = "1.1.1"
+description = "Python WinRT bindings for Bleak"
 category = "main"
 optional = false
 python-versions = "*"
 
 [[package]]
-name = "chardet"
-version = "4.0.0"
-description = "Universal encoding detector for Python 2 and 3"
+name = "certifi"
+version = "2022.5.18.1"
+description = "Python package for providing Mozilla's CA Bundle."
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = ">=3.6"
+
+[[package]]
+name = "charset-normalizer"
+version = "2.0.12"
+description = "The Real First Universal Charset Detector. Open, modern and actively maintained alternative to Chardet."
+category = "main"
+optional = false
+python-versions = ">=3.5.0"
+
+[package.extras]
+unicode_backport = ["unicodedata2"]
+
+[[package]]
+name = "dbus-next"
+version = "0.2.3"
+description = "A zero-dependency DBus library for Python with asyncio support"
+category = "main"
+optional = false
+python-versions = ">=3.6.0"
 
 [[package]]
 name = "idna"
-version = "2.10"
+version = "3.3"
 description = "Internationalized Domain Names in Applications (IDNA)"
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+python-versions = ">=3.5"
 
 [[package]]
 name = "metawear"
@@ -32,13 +66,55 @@ python-versions = ">=3.4"
 develop = true
 
 [package.dependencies]
+bleak = "*"
 pyserial = "*"
 requests = "*"
-warble = ">=1.2.8,<2.0"
 
 [package.source]
 type = "directory"
 url = ".."
+
+[[package]]
+name = "pyobjc-core"
+version = "8.5"
+description = "Python<->ObjC Interoperability Module"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[[package]]
+name = "pyobjc-framework-cocoa"
+version = "8.5"
+description = "Wrappers for the Cocoa frameworks on macOS"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyobjc-core = ">=8.5"
+
+[[package]]
+name = "pyobjc-framework-corebluetooth"
+version = "8.5"
+description = "Wrappers for the framework CoreBluetooth on macOS"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyobjc-core = ">=8.5"
+pyobjc-framework-Cocoa = ">=8.5"
+
+[[package]]
+name = "pyobjc-framework-libdispatch"
+version = "8.5"
+description = "Wrappers for libdispatch on macOS"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+pyobjc-core = ">=8.5"
 
 [[package]]
 name = "pyserial"
@@ -53,73 +129,115 @@ cp2110 = ["hidapi"]
 
 [[package]]
 name = "requests"
-version = "2.25.1"
+version = "2.27.1"
 description = "Python HTTP for Humans."
 category = "main"
 optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*"
 
 [package.dependencies]
 certifi = ">=2017.4.17"
-chardet = ">=3.0.2,<5"
-idna = ">=2.5,<3"
+charset-normalizer = {version = ">=2.0.0,<2.1.0", markers = "python_version >= \"3\""}
+idna = {version = ">=2.5,<4", markers = "python_version >= \"3\""}
 urllib3 = ">=1.21.1,<1.27"
 
 [package.extras]
-security = ["pyOpenSSL (>=0.14)", "cryptography (>=1.3.4)"]
 socks = ["PySocks (>=1.5.6,!=1.5.7)", "win-inet-pton"]
+use_chardet_on_py3 = ["chardet (>=3.0.2,<5)"]
 
 [[package]]
 name = "urllib3"
-version = "1.22"
+version = "1.26.9"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 category = "main"
 optional = false
-python-versions = "*"
+python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, <4"
 
 [package.extras]
+brotli = ["brotlicffi (>=0.8.0)", "brotli (>=1.0.9)", "brotlipy (>=0.6.0)"]
 secure = ["pyOpenSSL (>=0.14)", "cryptography (>=1.3.4)", "idna (>=2.0.0)", "certifi", "ipaddress"]
 socks = ["PySocks (>=1.5.6,!=1.5.7,<2.0)"]
 
-[[package]]
-name = "warble"
-version = "1.2.9"
-description = "Python bindings for MbientLab's Warble library"
-category = "main"
-optional = false
-python-versions = ">=3.4"
-
 [metadata]
 lock-version = "1.1"
-python-versions = ">=3.5"
-content-hash = "68aa8c4a6ac814f49575b73f9e43922e0f8b401b23ee2dc69aa7d715dc0f4df7"
+python-versions = "^3.7"
+content-hash = "0b397a47f005618bf6deb223ea1abc0d831b94d00e405dfc0a7ce3a570d7404d"
 
 [metadata.files]
-certifi = [
-    {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
-    {file = "certifi-2021.10.8.tar.gz", hash = "sha256:78884e7c1d4b00ce3cea67b44566851c4343c120abd683433ce934a68ea58872"},
+bleak = [
+    {file = "bleak-0.14.3-py2.py3-none-any.whl", hash = "sha256:1740c09039e58a65023a3c7141609bff1300dff2b5f7ab103a3218063803e965"},
+    {file = "bleak-0.14.3.tar.gz", hash = "sha256:760e5bb1e804087f762576b9b9563d63b47d521b1652988e28c3cb5e64b61990"},
 ]
-chardet = [
-    {file = "chardet-4.0.0-py2.py3-none-any.whl", hash = "sha256:f864054d66fd9118f2e67044ac8981a54775ec5b67aed0441892edb553d21da5"},
-    {file = "chardet-4.0.0.tar.gz", hash = "sha256:0d6f53a15db4120f2b08c94f11e7d93d2c911ee118b6b30a04ec3ee8310179fa"},
+bleak-winrt = [
+    {file = "bleak-winrt-1.1.1.tar.gz", hash = "sha256:3e7765f98d71b5229d95bd3b197931994dead40f3144e7186de7b8f664e26df0"},
+    {file = "bleak_winrt-1.1.1-cp310-cp310-win32.whl", hash = "sha256:f1ab6641cfdadce69126b459c5d30f1a934384bc0c37632393163eea3c94d7a8"},
+    {file = "bleak_winrt-1.1.1-cp310-cp310-win_amd64.whl", hash = "sha256:79a87c7fcc99838bf7f71765e855a74a80e085c4aedde14d0931d56a9f87be77"},
+    {file = "bleak_winrt-1.1.1-cp37-cp37m-win32.whl", hash = "sha256:1cf652fe38822216c093d4322b9899f54bff3169c4fc48ee8dd10bc1938ec59c"},
+    {file = "bleak_winrt-1.1.1-cp37-cp37m-win_amd64.whl", hash = "sha256:09b64b9b768dfa3abab16e67f7e0d476a0e9d86da2975a2487e033ce2be96663"},
+    {file = "bleak_winrt-1.1.1-cp38-cp38-win32.whl", hash = "sha256:1c4a9ee0c3195d07a3fd8f994953075443563c2c5c8e608cd09f3d0eaac540ed"},
+    {file = "bleak_winrt-1.1.1-cp38-cp38-win_amd64.whl", hash = "sha256:e75b8d5aad3169bd528be9ccbacb775fb0d07f1714ca93b1efa6687c47a1b755"},
+    {file = "bleak_winrt-1.1.1-cp39-cp39-win32.whl", hash = "sha256:e0da28651f8e83aaaea4113d084880f1fafae75c29c2a70429ae1f0b8681dc52"},
+    {file = "bleak_winrt-1.1.1-cp39-cp39-win_amd64.whl", hash = "sha256:7481aed7d17e8c2aa2bf9e3786206e382f710f516e00887d825df1b7a4c613d5"},
+]
+certifi = [
+    {file = "certifi-2022.5.18.1-py3-none-any.whl", hash = "sha256:f1d53542ee8cbedbe2118b5686372fb33c297fcd6379b050cca0ef13a597382a"},
+    {file = "certifi-2022.5.18.1.tar.gz", hash = "sha256:9c5705e395cd70084351dd8ad5c41e65655e08ce46f2ec9cf6c2c08390f71eb7"},
+]
+charset-normalizer = [
+    {file = "charset-normalizer-2.0.12.tar.gz", hash = "sha256:2857e29ff0d34db842cd7ca3230549d1a697f96ee6d3fb071cfa6c7393832597"},
+    {file = "charset_normalizer-2.0.12-py3-none-any.whl", hash = "sha256:6881edbebdb17b39b4eaaa821b438bf6eddffb4468cf344f09f89def34a8b1df"},
+]
+dbus-next = [
+    {file = "dbus_next-0.2.3-py3-none-any.whl", hash = "sha256:58948f9aff9db08316734c0be2a120f6dc502124d9642f55e90ac82ffb16a18b"},
+    {file = "dbus_next-0.2.3.tar.gz", hash = "sha256:f4eae26909332ada528c0a3549dda8d4f088f9b365153952a408e28023a626a5"},
 ]
 idna = [
-    {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
-    {file = "idna-2.10.tar.gz", hash = "sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6"},
+    {file = "idna-3.3-py3-none-any.whl", hash = "sha256:84d9dd047ffa80596e0f246e2eab0b391788b0503584e8945f2368256d2735ff"},
+    {file = "idna-3.3.tar.gz", hash = "sha256:9d643ff0a55b762d5cdb124b8eaa99c66322e2157b69160bc32796e824360e6d"},
 ]
 metawear = []
+pyobjc-core = [
+    {file = "pyobjc-core-8.5.tar.gz", hash = "sha256:704c275439856c0d1287469f0d589a7d808d48b754a93d9ce5415d4eaf06d576"},
+    {file = "pyobjc_core-8.5-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:0c234143b48334443f5adcf26e668945a6d47bc1fa6223e80918c6c735a029d9"},
+    {file = "pyobjc_core-8.5-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:1486ee533f0d76f666804ce89723ada4db56bfde55e56151ba512d3f849857f8"},
+    {file = "pyobjc_core-8.5-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:412de06dfa728301c04b3e46fd7453320a8ae8b862e85236e547cd797a73b490"},
+    {file = "pyobjc_core-8.5-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:0b3e09cccb1be574a82cc9f929ae27fc4283eccc75496cb5d51534caa6bb83a3"},
+    {file = "pyobjc_core-8.5-cp38-cp38-macosx_11_0_universal2.whl", hash = "sha256:eeafe21f879666ab7f57efcc6b007c9f5f8733d367b7e380c925203ed83f000d"},
+    {file = "pyobjc_core-8.5-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:c0071686976d7ea8c14690950e504a13cb22b4ebb2bc7b5ec47c1c1c0f6eff41"},
+]
+pyobjc-framework-cocoa = [
+    {file = "pyobjc-framework-Cocoa-8.5.tar.gz", hash = "sha256:569bd3a020f64b536fb2d1c085b37553e50558c9f907e08b73ffc16ae68e1861"},
+    {file = "pyobjc_framework_Cocoa-8.5-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:7a7c160416696bf6035dfcdf0e603aaa52858d6afcddfcc5ab41733619ac2529"},
+    {file = "pyobjc_framework_Cocoa-8.5-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:6ceba444282030be8596b812260e8d28b671254a51052ad778d32da6e17db847"},
+    {file = "pyobjc_framework_Cocoa-8.5-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:f46b2b161b8dd40c7b9e00bc69636c3e6480b2704a69aee22ee0154befbe163a"},
+    {file = "pyobjc_framework_Cocoa-8.5-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:b31d425aee8698cbf62b187338f5ca59427fa4dca2153a73866f7cb410713119"},
+    {file = "pyobjc_framework_Cocoa-8.5-cp38-cp38-macosx_11_0_universal2.whl", hash = "sha256:898359ac1f76eedec8aa156847682378a8950824421c40edb89391286e607dc4"},
+    {file = "pyobjc_framework_Cocoa-8.5-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:baa2947f76b119a3360973d74d57d6dada87ac527bab9a88f31596af392f123c"},
+]
+pyobjc-framework-corebluetooth = [
+    {file = "pyobjc-framework-CoreBluetooth-8.5.tar.gz", hash = "sha256:d83928083b0fc1aa9f653b3bbc4c22558559adbd82689aa461f4ccb295669dd2"},
+    {file = "pyobjc_framework_CoreBluetooth-8.5-cp36-abi3-macosx_10_9_universal2.whl", hash = "sha256:19b42a2020ee36e2b0e9b8ae64fb130084a609612fcdedafea7cb53234d3cb63"},
+    {file = "pyobjc_framework_CoreBluetooth-8.5-cp36-abi3-macosx_10_9_x86_64.whl", hash = "sha256:ef319beb88d8e75af61eb8f0fef01c6fe186d9a271718bcfaafc68c599af8c37"},
+    {file = "pyobjc_framework_CoreBluetooth-8.5-cp36-abi3-macosx_11_0_universal2.whl", hash = "sha256:57ae20e1dc54b8f0805cda8681a5293b11a499d053df5bdae459d4ca8c67756c"},
+]
+pyobjc-framework-libdispatch = [
+    {file = "pyobjc-framework-libdispatch-8.5.tar.gz", hash = "sha256:f610a0e57e9bb31878776db0a1c1cfd279f4e43e26e3195c6647786b4522b1c4"},
+    {file = "pyobjc_framework_libdispatch-8.5-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:63808d104951f7f721be6ad3de194f23c8e2f7a93c771e07961c63d70f2628c3"},
+    {file = "pyobjc_framework_libdispatch-8.5-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:8c67972b6e068ce168611852742cbabe59cbb4a33d3750a351171a7c062771f9"},
+    {file = "pyobjc_framework_libdispatch-8.5-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:5a1cc3bb6014c28a4223ad9f2257057f7d2861087c87c81c9649813fc7ec43a6"},
+    {file = "pyobjc_framework_libdispatch-8.5-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:c22da1d79a5b0b22e3f040f40c63c51cd46e275a82f143cf2630f772ffc1a4ef"},
+    {file = "pyobjc_framework_libdispatch-8.5-cp38-cp38-macosx_11_0_universal2.whl", hash = "sha256:05d20953557924f4280a6186600600cf5ea4391f5612b43155b3b2a7dfda6b61"},
+    {file = "pyobjc_framework_libdispatch-8.5-cp39-cp39-macosx_10_9_universal2.whl", hash = "sha256:fa9d4b446dc62c15fd04c65decbb36530bf866231f2630262a6435e11d53bf77"},
+]
 pyserial = [
     {file = "pyserial-3.5-py2.py3-none-any.whl", hash = "sha256:c4451db6ba391ca6ca299fb3ec7bae67a5c55dde170964c7a14ceefec02f2cf0"},
     {file = "pyserial-3.5.tar.gz", hash = "sha256:3c77e014170dfffbd816e6ffc205e9842efb10be9f58ec16d3e8675b4925cddb"},
 ]
 requests = [
-    {file = "requests-2.25.1-py2.py3-none-any.whl", hash = "sha256:c210084e36a42ae6b9219e00e48287def368a26d03a048ddad7bfee44f75871e"},
-    {file = "requests-2.25.1.tar.gz", hash = "sha256:27973dd4a904a4f13b263a19c866c13b92a39ed1c964655f025f3f8d3d75b804"},
+    {file = "requests-2.27.1-py2.py3-none-any.whl", hash = "sha256:f22fa1e554c9ddfd16e6e41ac79759e17be9e492b3587efa038054674760e72d"},
+    {file = "requests-2.27.1.tar.gz", hash = "sha256:68d7c56fd5a8999887728ef304a6d12edc7be74f1cfa47714fc8b414525c9a61"},
 ]
 urllib3 = [
-    {file = "urllib3-1.22-py2.py3-none-any.whl", hash = "sha256:06330f386d6e4b195fbfc736b297f58c5a892e4440e54d294d7004e3a9bbea1b"},
-    {file = "urllib3-1.22.tar.gz", hash = "sha256:cc44da8e1145637334317feebd728bd869a35285b93cbb4cca2577da7e62db4f"},
-]
-warble = [
-    {file = "warble-1.2.9.tar.gz", hash = "sha256:a1ecdc443d4075d5a60d80f1b9e1341302b4f9437f119e46431c24742cf8c686"},
+    {file = "urllib3-1.26.9-py2.py3-none-any.whl", hash = "sha256:44ece4d53fb1706f667c9bd1c648f5469a2ec925fcf3a776667042d645472c14"},
+    {file = "urllib3-1.26.9.tar.gz", hash = "sha256:aabaf16477806a5e1dd19aa41f8c2b7950dd3c746362d7e3223dbe6de6ac448e"},
 ]
