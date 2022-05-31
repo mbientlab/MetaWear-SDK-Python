@@ -3,10 +3,12 @@ from .cbindings import *
 from collections import deque
 from ctypes import *
 from distutils.version import LooseVersion
-from mbientlab.warble import Gatt
+from bleak import BleakClient
 from threading import Event
 from types import SimpleNamespace
 
+import asyncio
+import functools
 import copy
 import errno
 import json
@@ -19,6 +21,7 @@ import uuid
 import serial
 import serial.tools.list_ports as list_ports
 import threading
+import warnings
 
 _is_linux = platform.system() == 'Linux'
 
@@ -88,6 +91,14 @@ class MetaWearUSB(object):
         self.address = address
         self.ser = None
 
+    async def connect(self):
+        """Connect to device by establishing USB serial comm link"""
+        future = asyncio.get_running_loop().create_future()
+        self.connect_async(
+            handler=lambda error: future.set_result(None) if error is None else future.set_error(error)
+        )
+        await future
+
     def connect_async(self, handler):
         """Connect to device by establishing USB serial comm link"""
         status = None
@@ -149,9 +160,19 @@ class MetaWearUSB(object):
 
             self.ser.close()
             self.ser = None
-        
+
         if self._disconnect_handler is not None:
             self._disconnect_handler(Const.STATUS_OK)
+
+        # Try to return an awaitable Future for bleak compatability
+        # If we're not in an async context, return nothing for warble compatibility
+        try:
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+            future.set_result(None)
+            return future
+        except RuntimeError:
+            pass
 
     def _write(self, cmd_str):
         """Encodes MetaWear command with serial line protocol."""
@@ -171,15 +192,26 @@ class MetaWearUSB(object):
         """Async write without response"""
         self._write(cmd_str)
         handler(None)
-    
+
     def service_exists(self, uuid):
         """Checks supported GATT services"""
+        # Warble backwards compatibility
+        return self._get_service(uuid)
+
+    async def services(self):
+        return SimpleNamespace(
+            get_service = self._get_service,
+            get_characteristic = self._get_characteristic,
+        )
+
+    def _get_service(self, uuid):
         if uuid.lower() == MetaWear.GATT_SERVICE or uuid.lower() == MetaWearUSB.GATT_DIS:
-            return True
-        return False
+            return SimpleNamespace() # only care that it exists
+        return None
 
     def find_characteristic(self, uuid):
         """Find GATT Characteristic by UUID"""
+        # Warble backwards compatibility
         if uuid.lower() == MetaWear.GATT_SERVICE or uuid.lower() == MetaWearUSB.GATT_MW_CHAR_COMMAND:
             return SimpleNamespace(write_async = self._write_async,
                                    write_without_resp_async = self._write_without_resp_async)
@@ -190,11 +222,28 @@ class MetaWearUSB(object):
             return SimpleNamespace(read_value_async = lambda x: x(self.info[MetaWear._DEV_INFO[uuid]].encode(), None))
         return None
 
+    def _get_characteristic(self, uuid):
+        """Find GATT Characteristic by UUID"""
+        if self.find_characteristic(uuid) is not None:
+            return SimpleNamespace(uuid=uuid.lower())
+
     def on_notification_received(self, handler):
         """Registers notification received handler"""
+        # Warble backwards compatibility
         self._notify_handler = handler
 
+    async def start_notify(self, uuid, callback):
+        if uuid == MetaWearUSB.GATT_MW_CHAR_NOTIFICATION:
+            self.on_notification_received(lambda value: callback(uuid, value))
+        else:
+            raise ValueError("UUID uuid not supported")
+
     def on_disconnect(self, handler):
+        """Registers disconnect handler"""
+        # Warble backwards compatibility
+        self._disconnect_handler = handler
+
+    def set_disconnected_callback(self, handler):
         """Registers disconnect handler"""
         self._disconnect_handler = handler
 
@@ -251,6 +300,26 @@ class MetaWearUSB(object):
                 self._write_poll = False
                 self.disconnect()
         
+def synchronous(asyncio_function):
+    """Decorator to convert asyncio function to synchronous function."""
+
+    @functools.wraps(asyncio_function)
+    def sync_function(*args, **kwargs):
+        """Synchronous function wrapper"""
+        loop = asyncio.get_event_loop()
+        coroutine = asyncio_function(*args, **kwargs)
+        if not loop.is_running():
+            loop.run_until_complete(coroutine)
+        else:
+            asyncio.run_coroutine_threadsafe(coroutine, loop).result(timeout=None)
+
+    warnings.warn(
+        "Using this function is deprecated. "
+        "Please use the asyncio {asyncio_function.__name__} directly instead",
+        DeprecationWarning,
+    )
+    return sync_function
+
 class MetaWear(object):
     GATT_SERVICE = "326a9000-85cb-9195-d9dd-464cfbbae75a"
     _DEV_INFO = {
@@ -271,14 +340,38 @@ class MetaWear(object):
         @params:
             address     - Required  : Mac address of the board to connect to e.g. E8:C9:8F:52:7B:07
             cache_path  - Optional  : Path the SDK uses for cached data, defaults to '.metawear' in the local directory
-            hci_mac     - Optional  : Mac address of the hci device to uses, Warble will pick one if not set
+                                      The OS may also have it's own BLE Device cache.
+            hci_mac     - Optional  : Mac address of the hci device to uses.
+                                      Deprecated, as bleak does not yet support this.
+            hci_device  - Optional  : Name of the hci device to use. bleak defaults to `hci0`.
             deserialize - Optional  : Deserialize the cached C++ SDK state if available, defaults to true
         """
         args = {}
         if (_is_linux and 'hci_mac' in kwargs):
-            args['hci'] = kwargs['hci_mac']
-        self.warble = Gatt(address.upper(), **args)
-        self.conn = self.warble
+            warnings.warn(
+                "The hci_mac parameter is deprecated, as bleak does not yet support this. ",
+                "Please use the hci_device parameter instead.",
+                DeprecationWarning,
+            )
+            import subprocess
+            result = subprocess.run(["hcitool", "dev"], capture_output=True, check=True, timeout=1, encoding="utf8")
+            device_list = result.stdout.splitlines()[1:]
+
+            devices = {
+                device_line.split()[1]: device_line.split()[0]
+                for device_line in device_list
+            }
+            if kwargs["hci_mac"] in devices:
+                args["adapter"] = devices[kwargs["hci_mac"]]
+            else:
+                raise RuntimeError(
+                    f"Could not find hci device matching {kwargs['hci_mac']}. "
+                    f"Devices found were: {result.stdout}"
+                )
+        elif _is_linux and 'hci_device' in kwargs:
+            args['adapter'] = kwargs['hci_device']
+        self.bleak = BleakClient(address, **args)
+        self.conn = self.bleak
 
         self.usb = MetaWearUSB(address.upper())
 
@@ -319,159 +412,171 @@ class MetaWear(object):
         """
         True if the board is in MetaBoot mode.  The only permitted operation for MetaBoot boards is to update the firmware
         """
-        return self.conn.service_exists("00001530-1212-efde-1523-785feabcd123")
+        return synchronous(self.in_metaboot_mode_asyncio)()
+
+    async def in_metaboot_mode_asyncio(self):
+        services = await self.conn.get_services()
+        return services.get_service("00001530-1212-efde-1523-785feabcd123") is not None
 
     def disconnect(self):
         """
         Disconnects from the MetaWear board
         """
-        self.conn.disconnect()
+        synchronous(self.disconnect_asyncio)()
+
+    async def disconnect_asyncio(self):
+        """
+        Disconnects the MetaWear board asynchronously.
+        """
+        await self.conn.disconnect()
 
     def connect_async(self, handler, **kwargs):
         """
-        Connects to the MetaWear board and initializes the SDK.  You must first connect to the board before using 
+        Connects to the MetaWear board and initializes the SDK.  You must first connect to the board before using
         any of the SDK functions
         @params:
             handler     - Required  : `(BaseException) -> void` function to handle the result of the task
             serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
         """
+        asyncio.ensure_future(
+            self.connect_asyncio(**kwargs)
+        ).add_done_callback(lambda f: handler(f.exception()))
 
-        def completed(err):
-            if (err != None):
-                handler(err)
-            else:
-                if not self.in_metaboot_mode:
-                    def init_handler(context, device, status):
-                        if status != Const.STATUS_OK:
-                            self.disconnect()
-                            handler(RuntimeError("Error initializing the API (%d)" % (status)))
-                        else:
-                            if 'serialize' not in kwargs or kwargs['serialize']:
-                                self.serialize()
-                            handler(None)
-
-                    self._init_handler = FnVoid_VoidP_VoidP_Int(init_handler)
-                    libmetawear.mbl_mw_metawearboard_initialize(self.board, None, self._init_handler)
-                else:
-                    def read_task():
-                        uuids = self._read_dev_info_state['uuids']
-                        if(len(uuids)):
-                            next = uuids.popleft()
-                            self._read_dev_info_state['next'] = next                         
-                            if (MetaWear._DEV_INFO[next] not in self.info):
-                                gatt_char = self.conn.find_characteristic(next)
-                                if (gatt_char == None):
-                                    handler(RuntimeError("Missing gatt char '%s'" % (next)))
-                                else:
-                                    gatt_char.read_value_async(self._read_dev_info_state['completed'])
-                            else:
-                                read_task()
-                        else:
-                            handler(None)
-
-                    def completed(value, error):
-                        if (error == None): 
-                            self.info[MetaWear._DEV_INFO[self._read_dev_info_state['next']]] = bytearray(value).decode('utf8')
-                            read_task()
-                        else:
-                            handler(error)
-
-                    self._read_dev_info_state = {
-                        'uuids': deque(MetaWear._DEV_INFO.keys()),
-                        'completed': completed,
-                        'read_task': read_task
-                    }
-
-                    read_task()
+    async def connect_asyncio(self, **kwargs):
+        """
+        Connects to the MetaWear board and initializes the SDK.  You must first connect to the board before using
+        any of the SDK functions
+        @params:
+            serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
+        """
 
         if 'firmware' in self.info: del self.info['firmware']
-        
-        self.conn = self.usb if self.usb.is_enumerated else self.warble
-        self.conn.connect_async(completed)
+
+        self.conn = self.usb if self.usb.is_enumerated else self.bleak
+        await self.conn.connect()
+
+        in_metaboot_mode = await self.in_metaboot_mode_asyncio()
+
+        loop = asyncio.get_running_loop()
+
+        if not in_metaboot_mode:
+            initalised = loop.create_future()
+            def init_handler(context, device, status):
+                if status != Const.STATUS_OK:
+                    self.disconnect()
+                    initalised.set_exception(RuntimeError("Error initializing the API (%d)" % (status)))
+                else:
+                    if 'serialize' not in kwargs or kwargs['serialize']:
+                        self.serialize()
+                    initalised.set_result(None)
+
+            self._init_handler = FnVoid_VoidP_VoidP_Int(init_handler)
+            libmetawear.mbl_mw_metawearboard_initialize(self.board, None, self._init_handler)
+
+            await initalised
+        else:
+            services = await self.conn.get_services()
+
+            for uuid in MetaWear._DEV_INFO:
+                gatt_char = services.get_characteristic(uuid)
+                if gatt_char is None:
+                    raise RuntimeError("Missing gatt char '%s'" % (next))
+
+                gatt_value_bytes = await self.conn.read_gatt_char(uuid)
+                self.info[MetaWear._DEV_INFO[uuid]] = bytearray(gatt_value_bytes).decode('utf8')
 
     def connect(self, **kwargs):
         """
         Synchronous variant of `connect_async`
         """
-        e = Event()
-        result = []
-
-        def completed(error):
-            result.append(error)
-            e.set()
-
-        self.connect_async(completed)
-        e.wait()
-
-        if (result[0] != None):
-            raise result[0]
+        synchronous(self.connect_asyncio)(**kwargs)
 
     def _read_gatt_char(self, context, caller, ptr_gattchar, handler):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
 
-        gatt_char = self.conn.find_characteristic(uuid)
+        loop = asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(
+            self._read_gatt_char_asyncio(caller, uuid, handler),
+            loop
+        )
 
+    async def _read_gatt_char_asyncio(self, caller, uuid, handler):
+        services = await self.conn.get_services()
+        gatt_char = services.get_characteristic(uuid)
         if (gatt_char == None):
             print("gatt char '%s' does not exist" % (uuid))
-            
-        def completed(value, error):
-            if error == None:
-                read_value = bytearray(value)
-                self.info[MetaWear._DEV_INFO[uuid]] = read_value.decode('utf8')
+            return
 
-                handler(caller, cast(_array_to_buffer(value), POINTER(c_ubyte)), len(value))
-            else:
-                print("%s: Error reading gatt char (%s)" % (gatt_char.uuid, error))
+        gatt_value_bytes = await self.conn.read_gatt_char(gatt_char)
+        self.info[MetaWear._DEV_INFO[uuid]] = gatt_value_bytes.decode('utf8')
 
-        gatt_char.read_value_async(completed)
-        
-    def _write_char_async(self, force):
-        count = len(self.write_queue)
-        if (count > 0 and (force or count == 1)):
-            next = self.write_queue[0]
+        handler(
+            caller, cast(_array_to_buffer(gatt_value_bytes), POINTER(c_ubyte)), len(gatt_value_bytes),
+        )
 
-            def completed(err):
-                if (err != None):
-                    print(str(err))
-                temp = self.write_queue.popleft()
-                self._write_char_async(True)
+    async def _write_char_asyncio(self):
+        """Loops over the contents of self.write_queue and writes them to the board.
 
-            if (next[2] == GattCharWriteType.WITH_RESPONSE):
-                next[0].write_async(next[1], completed)
-            else:
-                next[0].write_without_resp_async(next[1], completed)
+        This function returns instantly if it's already being run by another thread.
+        """
+        if len(self.write_queue) > 1:
+            # if self.write_queue is greater than 1,
+            # assume that there's already another
+            # sender task running
+            return
+
+        while len(self.write_queue):
+            gatt_char_uuid, value, write_type = self.write_queue[0]
+            try:
+                await self.conn.write_gatt_char(gatt_char_uuid, value, write_type == GattCharWriteType.WITH_RESPONSE)
+                self.write_queue.popleft()
+            except Exception as e:
+                print(e)
 
     def _write_gatt_char(self, context, caller, write_type, ptr_gattchar, value, length):
-        gatt_char = self.conn.find_characteristic(_gattchar_to_string(ptr_gattchar.contents))
+        gatt_char_uuid = _gattchar_to_string(ptr_gattchar.contents)
         buffer = [value[i] for i in range(0, length)]
 
-        self.write_queue.append([gatt_char, buffer, write_type])
-        
-        self._write_char_async(False)
-        
+        self.write_queue.append([gatt_char_uuid, buffer, write_type])
+
+        loop = asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(self._write_char_asyncio(), loop)
+
     def _enable_notifications(self, context, caller, ptr_gattchar, handler, ready):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
-        gatt_char = self.conn.find_characteristic(uuid)
+        loop = asyncio.get_event_loop()
+        asyncio.run_coroutine_threadsafe(
+            self._enable_notifications_asyncio(caller, uuid, handler, ready),
+            loop,
+        )
+
+    async def _enable_notifications_asyncio(self, caller, uuid, handler, ready):
+        services = await self.conn.get_services()
+        gatt_char = services.get_characteristic(uuid)
 
         if (gatt_char == None):
             ready(caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
         else:
-            def completed(err):
-                if err != None:
-                    print(str(err))
-                    ready(caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
-                else:
-                    gatt_char.on_notification_received(lambda value: handler(caller, cast(_array_to_buffer(value), POINTER(c_ubyte)), len(value)))
-                    ready(caller, Const.STATUS_OK)
-
-            gatt_char.enable_notifications_async(completed)
+            try:
+                await self.conn.start_notify(
+                    gatt_char, lambda _uuid, value: handler(caller, cast(_array_to_buffer(value), POINTER(c_ubyte)), len(value)),
+                )
+                ready(caller, Const.STATUS_OK)
+            except Exception as err:
+                print(str(err))
+                ready(caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
 
     def _on_disconnect(self, context, caller, handler):
-        def event_handler(status):
+        def event_handler(_connection):
+            # todo, check if this status is correct?
+            # looks like this status value is being ignored, so maybe we can just set it to anything
+            # https://github.com/mbientlab/MetaWear-SDK-Cpp/blob/c25b278a18fd2aff0fd9553aa5f5eca43e235e0a/src/metawear/impl/cpp/metawearboard.cpp#L503
+            status = Const.STATUS_OK
             if (self.on_disconnect != None):
                 self.on_disconnect(status)
             handler(caller, status)
-        self.conn.on_disconnect(event_handler)
+
+        self.conn.set_disconnected_callback(event_handler)
 
     def _download_firmware(self, version=None):
         firmware_root = os.path.join(self.cache, "firmware")

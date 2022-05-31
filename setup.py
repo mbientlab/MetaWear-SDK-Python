@@ -35,7 +35,7 @@ class MetaWearBuild(build_py):
             if (f.startswith(basename)):
                 move(os.path.join(src, f), dest)
 
-    def run(self):        
+    def run(self):
         cpp_sdk = os.path.join(root, 'MetaWear-SDK-Cpp')
         system = platform.system()
         dist_dir = os.path.join(cpp_sdk, 'dist', 'release', 'lib', "Win32" if machine == "x86" and system == "Windows" else machine)
@@ -76,7 +76,7 @@ setup(
     author='MbientLab',
     author_email="hello@mbientlab.com",
     install_requires=[
-        'warble >= 1.2.8, < 2.0',
+        'bleak >= 0.14.3',
         'requests',
         'pyserial'
     ],
@@ -85,7 +85,7 @@ setup(
         'clean': MetaWearClean
     },
     keywords = ['sensors', 'mbientlab', 'metawear', 'bluetooth le', 'native'],
-    python_requires='>=3.4',
+    python_requires='>=3.7',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
