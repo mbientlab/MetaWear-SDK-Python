@@ -1,46 +1,35 @@
 # Requires: sudo pip3 install metawear
 # usage: sudo python3 scan_connect.py
-from __future__ import print_function
 from mbientlab.metawear import MetaWear
 from mbientlab.metawear.cbindings import *
-from mbientlab.warble import * 
-from time import sleep
+from bleak import BleakScanner
+import asyncio
 
-import platform
-import six
+async def main():
+    selection = -1
 
-selection = -1
-devices = None
+    while selection == -1:
+        print("scanning for devices...")
 
-while selection == -1:
-    print("scanning for devices...")
-    devices = {}
-    def handler(result):
-        devices[result.mac] = result.name
+        devices = await BleakScanner.discover()
 
-    BleScanner.set_handler(handler)
-    BleScanner.start()
+        i = 0
+        for device in devices:
+            print("[",i,"]", device)
+            i+= 1
 
-    sleep(10.0)
-    BleScanner.stop()
+        msg = "Select your device (-1 to rescan): "
+        selection = int(input(msg))
 
-    i = 0
-    for address, name in six.iteritems(devices):
-        print("[%d] %s (%s)" % (i, address, name))
-        i+= 1
+    address = list(devices)[selection].address
+    print("Connecting to %s..." % (address))
+    device = MetaWear(address)
+    await device.connect_asyncio()
 
-    msg = "Select your device (-1 to rescan): "
-    selection = int(raw_input(msg) if platform.python_version_tuple()[0] == '2' else input(msg))
+    print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
+    print("Device information: " + str(device.info))
 
-address = list(devices)[selection]
-print("Connecting to %s..." % (address))
-device = MetaWear(address)
-device.connect()
+    await device.disconnect_asyncio()
+    print("Disconnected")
 
-print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
-print("Device information: " + str(device.info))
-sleep(5.0)
-
-device.disconnect()
-sleep(1.0)
-print("Disconnected") 
+asyncio.run(main())
