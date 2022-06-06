@@ -320,7 +320,33 @@ def synchronous(asyncio_function):
     )
     return sync_function
 
-class MetaWear(object):
+
+def _run_in_coroutine(asyncio_method):
+    """Decorator to run coroutine in class loop.
+
+    Used so that C-like callback functions can call asyncio code.
+    """
+
+    @functools.wraps(asyncio_method)
+    def sync_function(self, *args, **kwargs):
+        """Synchronous function wrapper"""
+        if not self.loop.is_running():
+            raise RuntimeError("asyncio event loop is not running")
+
+        coroutine = asyncio_method(self, *args, **kwargs)
+        return asyncio.run_coroutine_threadsafe(
+            coroutine, self.loop
+        ).result(timeout=10.0)
+
+    return sync_function
+
+class MetaWearAsyncio(object):
+    """A Python asyncio MetaWear library.
+
+    Important: Please ensure that every call to
+    `libmetawear` is in a separate thread from the main asyncio event loop,
+    to avoid blocking the asyncio event thread.
+    """
     GATT_SERVICE = "326a9000-85cb-9195-d9dd-464cfbbae75a"
     _DEV_INFO = {
         "00002a27-0000-1000-8000-00805f9b34fb": "hardware",
@@ -407,40 +433,15 @@ class MetaWear(object):
         """
         return self.conn.is_connected
 
-    @property
-    def in_metaboot_mode(self):
-        """
-        True if the board is in MetaBoot mode.  The only permitted operation for MetaBoot boards is to update the firmware
-        """
-        return synchronous(self.in_metaboot_mode_asyncio)()
-
     async def in_metaboot_mode_asyncio(self):
         services = await self.conn.get_services()
         return services.get_service("00001530-1212-efde-1523-785feabcd123") is not None
-
-    def disconnect(self):
-        """
-        Disconnects from the MetaWear board
-        """
-        synchronous(self.disconnect_asyncio)()
 
     async def disconnect_asyncio(self):
         """
         Disconnects the MetaWear board asynchronously.
         """
         await self.conn.disconnect()
-
-    def connect_async(self, handler, **kwargs):
-        """
-        Connects to the MetaWear board and initializes the SDK.  You must first connect to the board before using
-        any of the SDK functions
-        @params:
-            handler     - Required  : `(BaseException) -> void` function to handle the result of the task
-            serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
-        """
-        asyncio.ensure_future(
-            self.connect_asyncio(**kwargs)
-        ).add_done_callback(lambda f: handler(f.exception()))
 
     async def connect_asyncio(self, **kwargs):
         """
@@ -449,6 +450,10 @@ class MetaWear(object):
         @params:
             serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
         """
+        try:
+            self.loop
+        except AttributeError:
+            self.loop = asyncio.get_running_loop()
 
         if 'firmware' in self.info: del self.info['firmware']
 
@@ -457,21 +462,26 @@ class MetaWear(object):
 
         in_metaboot_mode = await self.in_metaboot_mode_asyncio()
 
-        loop = asyncio.get_running_loop()
-
         if not in_metaboot_mode:
-            initalised = loop.create_future()
-            def init_handler(context, device, status):
+            initalised = self.loop.create_future()
+
+            @_run_in_coroutine
+            async def init_handler(self, context, device, status):
                 if status != Const.STATUS_OK:
-                    self.disconnect()
+                    await self.disconnect_asyncio()
                     initalised.set_exception(RuntimeError("Error initializing the API (%d)" % (status)))
                 else:
                     if 'serialize' not in kwargs or kwargs['serialize']:
-                        self.serialize()
+                        await self.serialize_async()
                     initalised.set_result(None)
 
-            self._init_handler = FnVoid_VoidP_VoidP_Int(init_handler)
-            libmetawear.mbl_mw_metawearboard_initialize(self.board, None, self._init_handler)
+            self._init_handler = FnVoid_VoidP_VoidP_Int(
+                lambda *args:
+                    init_handler(self, *args)
+                )
+            await asyncio.to_thread(
+                libmetawear.mbl_mw_metawearboard_initialize, self.board, None, self._init_handler,
+            )
 
             await initalised
         else:
@@ -485,22 +495,10 @@ class MetaWear(object):
                 gatt_value_bytes = await self.conn.read_gatt_char(uuid)
                 self.info[MetaWear._DEV_INFO[uuid]] = bytearray(gatt_value_bytes).decode('utf8')
 
-    def connect(self, **kwargs):
-        """
-        Synchronous variant of `connect_async`
-        """
-        synchronous(self.connect_asyncio)(**kwargs)
-
-    def _read_gatt_char(self, context, caller, ptr_gattchar, handler):
+    @_run_in_coroutine
+    async def _read_gatt_char(self, context, caller, ptr_gattchar, handler):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
 
-        loop = asyncio.get_event_loop()
-        asyncio.run_coroutine_threadsafe(
-            self._read_gatt_char_asyncio(caller, uuid, handler),
-            loop
-        )
-
-    async def _read_gatt_char_asyncio(self, caller, uuid, handler):
         services = await self.conn.get_services()
         gatt_char = services.get_characteristic(uuid)
         if (gatt_char == None):
@@ -510,104 +508,74 @@ class MetaWear(object):
         gatt_value_bytes = await self.conn.read_gatt_char(gatt_char)
         self.info[MetaWear._DEV_INFO[uuid]] = gatt_value_bytes.decode('utf8')
 
-        handler(
-            caller, cast(_array_to_buffer(gatt_value_bytes), POINTER(c_ubyte)), len(gatt_value_bytes),
+        await asyncio.to_thread(
+            handler, caller, cast(_array_to_buffer(gatt_value_bytes), POINTER(c_ubyte)), len(gatt_value_bytes),
         )
 
-    async def _write_char_asyncio(self):
-        """Loops over the contents of self.write_queue and writes them to the board.
+    async def _write_gatt_char_queue(self, until_event, semaphore = asyncio.Semaphore(1)):
+        """Writes GATT chars from the write queue in order.
 
-        This function returns instantly if it's already being run by another thread.
+        This function returns when the write queue is empty or when the specified until_event is set.
         """
-        if len(self.write_queue) > 1:
-            # if self.write_queue is greater than 1,
-            # assume that there's already another
-            # sender task running
-            return
+        async with semaphore: # semaphores don't ensure order, so we need to make a queue
+            while len(self.write_queue) > 0 and not until_event.is_set():
+                [gatt_char_uuid, buffer, write_type, event] = self.write_queue.popleft()
+                await self.conn.write_gatt_char(gatt_char_uuid, buffer, write_type == GattCharWriteType.WITH_RESPONSE)
+                event.set()
 
-        while len(self.write_queue):
-            gatt_char_uuid, value, write_type = self.write_queue[0]
-            try:
-                await self.conn.write_gatt_char(gatt_char_uuid, value, write_type == GattCharWriteType.WITH_RESPONSE)
-                self.write_queue.popleft()
-            except Exception as e:
-                print(e)
-
-    def _write_gatt_char(self, context, caller, write_type, ptr_gattchar, value, length):
+    @_run_in_coroutine
+    async def _write_gatt_char(self, context, caller, write_type, ptr_gattchar, value, length):
         gatt_char_uuid = _gattchar_to_string(ptr_gattchar.contents)
-        buffer = [value[i] for i in range(0, length)]
+        buffer = bytearray(value[i] for i in range(0, length))
 
-        self.write_queue.append([gatt_char_uuid, buffer, write_type])
+        event = asyncio.Event()
+        self.write_queue.append([gatt_char_uuid, buffer, write_type, event])
+        await self._write_gatt_char_queue(event)
 
-        loop = asyncio.get_event_loop()
-        asyncio.run_coroutine_threadsafe(self._write_char_asyncio(), loop)
-
-    def _enable_notifications(self, context, caller, ptr_gattchar, handler, ready):
+    @_run_in_coroutine
+    async def _enable_notifications(self, context, caller, ptr_gattchar, handler, ready):
         uuid = _gattchar_to_string(ptr_gattchar.contents)
-        loop = asyncio.get_event_loop()
-        asyncio.run_coroutine_threadsafe(
-            self._enable_notifications_asyncio(caller, uuid, handler, ready),
-            loop,
-        )
-
-    async def _enable_notifications_asyncio(self, caller, uuid, handler, ready):
         services = await self.conn.get_services()
         gatt_char = services.get_characteristic(uuid)
 
         if (gatt_char == None):
-            ready(caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
+            await asyncio.to_thread(ready, caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
         else:
             try:
                 await self.conn.start_notify(
-                    gatt_char, lambda _uuid, value: handler(caller, cast(_array_to_buffer(value), POINTER(c_ubyte)), len(value)),
+                    gatt_char,
+                    # runs the libmetawear handler in another thread, logging the error if one exists
+                    lambda _uuid, value: self.loop.create_task(asyncio.to_thread(
+                        handler, caller, cast(_array_to_buffer(value), POINTER(c_ubyte)), len(value)
+                    )).add_done_callback(lambda future: print(future.exception()) if future.exception() else None),
                 )
-                ready(caller, Const.STATUS_OK)
+                await asyncio.to_thread(ready, caller, Const.STATUS_OK)
             except Exception as err:
                 print(str(err))
-                ready(caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
+                await asyncio.to_thread(ready, caller, Const.STATUS_ERROR_ENABLE_NOTIFY)
+
+    def _on_disconnect_event_handler(self, _connection, caller, handler):
+        """Called by self.conn.set_disconnected_callback() on disconnect"""
+        # todo, check if this status is correct?
+        # looks like this status value is being ignored, so maybe we can just set it to anything
+        # https://github.com/mbientlab/MetaWear-SDK-Cpp/blob/c25b278a18fd2aff0fd9553aa5f5eca43e235e0a/src/metawear/impl/cpp/metawearboard.cpp#L503
+        status = Const.STATUS_OK
+        if (self.on_disconnect != None):
+            self.on_disconnect(status)
+        handler(caller, status)
 
     def _on_disconnect(self, context, caller, handler):
         def event_handler(_connection):
-            # todo, check if this status is correct?
-            # looks like this status value is being ignored, so maybe we can just set it to anything
-            # https://github.com/mbientlab/MetaWear-SDK-Cpp/blob/c25b278a18fd2aff0fd9553aa5f5eca43e235e0a/src/metawear/impl/cpp/metawearboard.cpp#L503
-            status = Const.STATUS_OK
-            if (self.on_disconnect != None):
-                self.on_disconnect(status)
-            handler(caller, status)
+            self.loop.create_task(
+                asyncio.to_thread(self._on_disconnect_event_handler(_connection, caller, handler))
+            ).add_done_callback(lambda future: print(future.exception()) if future.exception() else None),
 
         self.conn.set_disconnected_callback(event_handler)
 
-    def _download_firmware(self, version=None):
-        firmware_root = os.path.join(self.cache, "firmware")
-
-        info1 = os.path.join(firmware_root, "info1.json")
-        if not os.path.isfile(info1) or (time.time() - os.path.getmtime(info1)) > 1800.0:
-            info1_content = json.loads(_download_file("https://releases.mbientlab.com/metawear/info1.json", info1))
-        else:
-            with open(info1, "rb") as f:
-                info1_content = json.load(f)
-
-        if version is None:
-            versions = []
-            for k in info1_content[self.info['hardware']][self.info['model']]["vanilla"].keys():
-                versions.append(LooseVersion(k))
-            versions.sort()
-            target = str(versions[-1])
-        else:
-            if version not in info1_content[self.info['hardware']][self.info['model']]["vanilla"]:
-                raise ValueError("Firmware '%s' not available for this board" % (version))
-            target = version
-
-        filename = info1_content[self.info['hardware']][self.info['model']]["vanilla"][target]["filename"]
-        local_path = os.path.join(firmware_root, self.info['hardware'], self.info['model'], "vanilla", target, filename)
-
-        if not os.path.isfile(local_path):
-            url = "https://releases.mbientlab.com/metawear/{}/{}/{}/{}/{}".format(
-                self.info['hardware'], self.info['model'], "vanilla", target, filename
-            )
-            _download_file(url, local_path)
-        return local_path
+    async def serialize_async(self, *args, **kwargs):
+        # most of serialize code is uses libmetawear/heavy IO, so it's more efficient to run
+        # it in another thread
+        return await asyncio.to_thread(self.serialize, *args, **kwargs)
 
     def serialize(self):
         """
@@ -653,6 +621,128 @@ class MetaWear(object):
             return True
 
         return False
+
+def force_sync(fn):
+    """
+    turn an async method to sync method
+    """
+    @functools.wraps(fn)
+    def wrapper(self, *args, **kwargs):
+        self._start_asyncio_loop()
+        return _run_in_coroutine(fn)(self, *args, **kwargs)
+
+    return wrapper
+
+class MetaWear(MetaWearAsyncio):
+    """
+    MetaWear class for synchronous operations
+    """
+    def __init__(self, *args, **kwargs):
+        super(MetaWear, self).__init__(*args, **kwargs)
+
+    @property
+    @force_sync
+    async def in_metaboot_mode(self):
+        """
+        True if the board is in MetaBoot mode.  The only permitted operation for MetaBoot boards is to update the firmware
+        """
+        return await super(MetaWear, self).in_metaboot_mode_asyncio()
+
+    @force_sync
+    async def disconnect(self):
+        """
+        Disconnects from the MetaWear board
+        """
+        await super(MetaWear, self).disconnect_asyncio()
+
+    def connect_async(self, handler, **kwargs):
+        """
+        Connects to the MetaWear board and initializes the SDK.  You must first connect to the board before using
+        any of the SDK functions
+        @params:
+            handler     - Required  : `(BaseException) -> void` function to handle the result of the task
+            serialize   - Optional  : Serialize and cached C++ SDK state after initializaion, defaults to true
+        """
+        asyncio.ensure_future(
+            self.connect_asyncio(**kwargs), loop=self.loop,
+        ).add_done_callback(lambda f: handler(f.exception()))
+
+    def _start_asyncio_loop(self):
+        """Starts running the asyncio loop, required by Bleak Blutooth Library."""
+        try:
+            self.loop
+        except AttributeError:
+            self.loop = asyncio.get_event_loop()
+
+        # we need to start the asyncio/blutooth bleak loop
+        # in a separate thread, otherwise it will block the main thread
+        def asyncio_thread():
+            try:
+                self.loop.run_forever()
+            finally:
+                # after the loop is closed, let it run for a bit longer
+                # in case there are any other jobs running
+                self.loop.run_until_complete(asyncio.sleep(1))
+                self.loop.run_until_complete(self.loop.shutdown_asyncgens())
+                self.loop.close()
+
+        # starts running the loop forever
+        if not self.loop.is_running():
+            self._asyncio_thread = threading.Thread(target=asyncio_thread)
+            self._asyncio_thread.start()
+
+    def _stop_asyncio_loop(self):
+        """Stops running the asyncio loop, allowing the Python program to exit."""
+        if self.loop.is_running():
+            self.loop.stop()
+        if self._asyncio_thread.is_alive() and threading.current_thread() is not self._asyncio_thread:
+            self._asyncio_thread.join()
+
+    def _on_disconnect_event_handler(self, *args, **kwargs):
+        super(MetaWear, self)._on_disconnect_event_handler(*args, **kwargs)
+        self._stop_asyncio_loop()
+
+    @force_sync
+    async def connect(self, **kwargs):
+        """
+        Synchronous variant of `connect_async`
+        """
+        try:
+            return await self.connect_asyncio(**kwargs)
+        except Exception as e:
+            self._stop_asyncio_loop(self)
+            raise e
+
+    def _download_firmware(self, version=None):
+        firmware_root = os.path.join(self.cache, "firmware")
+
+        info1 = os.path.join(firmware_root, "info1.json")
+        if not os.path.isfile(info1) or (time.time() - os.path.getmtime(info1)) > 1800.0:
+            info1_content = json.loads(_download_file("https://releases.mbientlab.com/metawear/info1.json", info1))
+        else:
+            with open(info1, "rb") as f:
+                info1_content = json.load(f)
+
+        if version is None:
+            versions = []
+            for k in info1_content[self.info['hardware']][self.info['model']]["vanilla"].keys():
+                versions.append(LooseVersion(k))
+            versions.sort()
+            target = str(versions[-1])
+        else:
+            if version not in info1_content[self.info['hardware']][self.info['model']]["vanilla"]:
+                raise ValueError("Firmware '%s' not available for this board" % (version))
+            target = version
+
+        filename = info1_content[self.info['hardware']][self.info['model']]["vanilla"][target]["filename"]
+        local_path = os.path.join(firmware_root, self.info['hardware'], self.info['model'], "vanilla", target, filename)
+
+        if not os.path.isfile(local_path):
+            url = "https://releases.mbientlab.com/metawear/{}/{}/{}/{}/{}".format(
+                self.info['hardware'], self.info['model'], "vanilla", target, filename
+            )
+            _download_file(url, local_path)
+        return local_path
 
     def update_firmware_async(self, handler, **kwargs):
         """
