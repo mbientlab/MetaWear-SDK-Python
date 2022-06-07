@@ -566,9 +566,7 @@ class MetaWearAsyncio(object):
 
     def _on_disconnect(self, context, caller, handler):
         def event_handler(_connection):
-            self.loop.create_task(
-                asyncio.to_thread(self._on_disconnect_event_handler(_connection, caller, handler))
-            ).add_done_callback(lambda future: print(future.exception()) if future.exception() else None),
+            self._on_disconnect_event_handler(_connection, caller, handler)
 
         self.conn.set_disconnected_callback(event_handler)
 
