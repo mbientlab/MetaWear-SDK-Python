@@ -1,6 +1,6 @@
 # Requires: sudo pip3 install metawear
 # usage: sudo python3 scan_connect.py
-from mbientlab.metawear import MetaWear
+from mbientlab.metawear import MetaWearAsyncio
 from mbientlab.metawear.cbindings import *
 from bleak import BleakScanner
 import asyncio
@@ -23,7 +23,7 @@ async def main():
 
     address = list(devices)[selection].address
     print("Connecting to %s..." % (address))
-    device = MetaWear(address)
+    device = MetaWearAsyncio(address)
     await device.connect_asyncio()
 
     print("Connected to " + device.address + " over " + ("USB" if device.usb.is_connected else "BLE"))
