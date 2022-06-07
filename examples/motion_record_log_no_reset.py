@@ -79,7 +79,7 @@ for s in states:
     # setup any motion
     libmetawear.mbl_mw_acc_bosch_set_any_motion_count(s.device.board, 2)
     libmetawear.mbl_mw_acc_bosch_set_any_motion_threshold(s.device.board, 0.1)
-    libmetawear.mbl_mw_acc_bosch_write_motion_config(s.device.board)
+    libmetawear.mbl_mw_acc_bosch_write_motion_config(s.device.board, 1)
     print("setup bmi160 motion recognition")
 
     # get motion signal    
@@ -99,7 +99,7 @@ for s in states:
     libmetawear.mbl_mw_logging_start(s.device.board, 0)
     libmetawear.mbl_mw_acc_enable_acceleration_sampling(s.device.board)
     libmetawear.mbl_mw_acc_start(s.device.board)       
-    libmetawear.mbl_mw_acc_bosch_enable_motion_detection(s.device.board)
+    libmetawear.mbl_mw_acc_bosch_enable_motion_detection(s.device.board,1)
     libmetawear.mbl_mw_acc_bosch_start(s.device.board)
 
 sleep(6.0)

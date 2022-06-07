@@ -102,7 +102,7 @@ for s in states:
     libmetawear.mbl_mw_logging_start(s.device.board, 0)
     libmetawear.mbl_mw_acc_enable_acceleration_sampling(s.device.board)
     libmetawear.mbl_mw_acc_start(s.device.board)       
-    libmetawear.mbl_mw_acc_bosch_enable_motion_detection(s.device.board)
+    libmetawear.mbl_mw_acc_bosch_enable_motion_detection(s.device.board, 1)
     libmetawear.mbl_mw_acc_bosch_start(s.device.board)
 
 print("0 min")
