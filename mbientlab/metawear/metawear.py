@@ -95,7 +95,7 @@ class MetaWearUSB(object):
         """Connect to device by establishing USB serial comm link"""
         future = asyncio.get_running_loop().create_future()
         self.connect_async(
-            handler=lambda error: future.set_result(None) if error is None else future.set_error(error)
+            handler=lambda error: future.set_result(None) if error is None else future.set_exception(error)
         )
         await future
 
