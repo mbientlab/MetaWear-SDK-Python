@@ -29,7 +29,7 @@ try:
     print("Logging data for 10s")
     sleep(10.0)
 
-    print("Setop acc")
+    print("Setup acc")
     libmetawear.mbl_mw_acc_stop(d.board)
     libmetawear.mbl_mw_acc_disable_acceleration_sampling(d.board)
     
