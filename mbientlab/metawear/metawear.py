@@ -476,25 +476,25 @@ class MetaWear(object):
     def _download_firmware(self, version=None):
         firmware_root = os.path.join(self.cache, "firmware")
 
-        info1 = os.path.join(firmware_root, "info1.json")
-        if not os.path.isfile(info1) or (time.time() - os.path.getmtime(info1)) > 1800.0:
-            info1_content = json.loads(_download_file("https://releases.mbientlab.com/metawear/info1.json", info1))
+        info2 = os.path.join(firmware_root, "info2.json")
+        if not os.path.isfile(info2) or (time.time() - os.path.getmtime(info2)) > 1800.0:
+            info2_content = json.loads(_download_file("https://releases.mbientlab.com/metawear/info2.json", info2))
         else:
-            with open(info1, "rb") as f:
-                info1_content = json.load(f)
+            with open(info2, "rb") as f:
+                info2_content = json.load(f)
 
         if version is None:
             versions = []
-            for k in info1_content[self.info['hardware']][self.info['model']]["vanilla"].keys():
+            for k in info2_content[self.info['hardware']][self.info['model']]["vanilla"].keys():
                 versions.append(LooseVersion(k))
             versions.sort()
             target = str(versions[-1])
         else:
-            if version not in info1_content[self.info['hardware']][self.info['model']]["vanilla"]:
+            if version not in info2_content[self.info['hardware']][self.info['model']]["vanilla"]:
                 raise ValueError("Firmware '%s' not available for this board" % (version))
             target = version
 
-        filename = info1_content[self.info['hardware']][self.info['model']]["vanilla"][target]["filename"]
+        filename = info2_content[self.info['hardware']][self.info['model']]["vanilla"][target]["filename"]
         local_path = os.path.join(firmware_root, self.info['hardware'], self.info['model'], "vanilla", target, filename)
 
         if not os.path.isfile(local_path):
